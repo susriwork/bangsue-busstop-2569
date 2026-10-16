@@ -734,7 +734,19 @@ h1{font:700 21px/1.3 var(--f-display);margin:8px 0 4px;text-wrap:balance}
 .pin svg{width:20px;height:20px;display:block}
 .pin .lamp{position:absolute;top:-6px;right:-6px;width:12px;height:12px;border-radius:50%;border:2px solid #fff}
 .pin.dim{opacity:.18}
-.visbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 18px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.visbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 8px;padding:8px 18px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.vis-btns{display:flex;gap:6px}
+.vis-all:disabled{opacity:.4;cursor:default}
+.search{position:relative;display:flex;align-items:center;margin:12px 18px 0;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.search:focus-within{border-color:var(--stop);box-shadow:0 0 0 3px color-mix(in srgb,var(--stop) 18%,transparent)}
+.search svg{width:18px;height:18px;margin-left:10px;color:var(--muted);flex:none}
+.search input{flex:1;min-width:0;border:0;background:none;color:var(--ink);font:400 14px var(--f-body);padding:9px 8px;outline:none}
+.search input::-webkit-search-cancel-button{display:none}
+.q-clear{flex:none;width:32px;height:32px;margin-right:4px;border:0;border-radius:8px;background:none;color:var(--muted);font-size:18px;cursor:pointer}
+.q-clear:hover{background:var(--paper)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.road{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.hc .road{margin:-4px 0 6px}
 .vis-all{font:500 12.5px var(--f-body);background:none;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:3px 9px;cursor:pointer}
 .row-item{display:grid;grid-template-columns:1fr auto;align-items:start;gap:2px}
 .row-item .item{min-width:0}
@@ -819,6 +831,8 @@ img{-webkit-user-drag:none}
   .filters::-webkit-scrollbar{display:none}
   .chip{flex:none;padding:7px 12px;font-size:13.5px}
   .visbar{padding:8px 16px}
+  .search{margin:10px 16px 0}
+  .search input{font-size:16px;padding:10px 8px}
   .vis-all{padding:6px 10px}
   .list{padding:6px 8px 12px;overscroll-behavior:contain}
   .item{padding:12px 8px}
@@ -843,8 +857,14 @@ img{-webkit-user-drag:none}
       <p class="sub"><span class="desk-only">ชี้ที่ไอคอนเพื่อดูสถานะ กดเพื่อเปิดรายละเอียดและรูปทั้งหมด</span><span class="touch-only">แตะไอคอนบนแผนที่เพื่อดูสถานะและรูป</span></p>
     </div>
     <div class="stats" id="stats"></div>
+    <div class="search">
+      <label for="q" class="sr-only">ค้นหาจุดหรือชื่อถนน</label>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6-1.4 1.4-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>
+      <input id="q" type="search" placeholder="ค้นหา เช่น จุด12 หรือ ประชาชื่น" autocomplete="off" enterkeyhint="search">
+      <button type="button" id="qClear" class="q-clear" aria-label="ล้างคำค้น" hidden>×</button>
+    </div>
     <div class="filters" id="filters" role="group" aria-label="กรองจุด"></div>
-    <div class="visbar"><span id="visCount"></span><button type="button" id="visAll" class="vis-all"></button></div>
+    <div class="visbar"><span id="visCount"></span><span class="vis-btns"><button type="button" id="visOn" class="vis-all"></button><button type="button" id="visOff" class="vis-all"></button></span></div>
     <div class="list" id="list"></div>
     <div class="foot">ข้อมูล ณ 15 ต.ค. 2569 · พิกัดจากการสำรวจภาคสนาม ก.ย. 2569</div>
   </aside>
@@ -916,6 +936,48 @@ const POINTS = [
   {id:39, group:"shelter", lat:`13°48'25.08"N`, lng:`100°32'00.95"E`, tempCount:1},
 ];
 // hidden:true = ซ่อนไว้ตอนเปิดหน้า (ตรงกับที่ซ่อนไว้ใน Google Earth) ผู้ชมกดเปิดได้
+// ชื่อถนน [ถนน, จุดอ้างอิงใกล้เคียง, แขวง] จากพิกัด (OpenStreetMap / Nominatim, 17 ต.ค. 2569)
+const ROADS = {
+  1:["ถนนประชาราษฎร์สาย 2", "", "แขวงบางซื่อ"],
+  2:["ถนนประชาราษฎร์สาย 2", "", "แขวงบางซื่อ"],
+  3:["ถนนประชาราษฎร์สาย 1", "", "แขวงบางซื่อ"],
+  4:["ถนนประชาราษฎร์สาย 1", "", "แขวงวงศ์สว่าง"],
+  5:["ถนนประชาราษฎร์สาย 1", "", "แขวงบางซื่อ"],
+  6:["ถนนประชาราษฎร์สาย 1", "", "แขวงวงศ์สว่าง"],
+  7:["ถนนรัชดาภิเษก", "", "แขวงวงศ์สว่าง"],
+  8:["ถนนรัชดาภิเษก", "", "แขวงวงศ์สว่าง"],
+  9:["ถนนรัชดาภิเษก", "", "แขวงวงศ์สว่าง"],
+  10:["ถนนรัชดาภิเษก", "", "แขวงวงศ์สว่าง"],
+  11:["ถนนวงศ์สว่าง", "", "แขวงวงศ์สว่าง"],
+  12:["ถนนวงศ์สว่าง", "", "แขวงวงศ์สว่าง"],
+  13:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงบางซื่อ"],
+  14:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงบางซื่อ"],
+  15:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงบางซื่อ"],
+  16:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงวงศ์สว่าง"],
+  17:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงวงศ์สว่าง"],
+  18:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงวงศ์สว่าง"],
+  19:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงบางซื่อ"],
+  20:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงบางซื่อ"],
+  21:["ถนนกรุงเทพ-นนทบุรี", "", "แขวงบางซื่อ"],
+  22:["ถนนประชาชื่น", "", "แขวงบางซื่อ"],
+  23:["ถนนประชาชื่น", "", "แขวงบางซื่อ"],
+  24:["ถนนประชาชื่น", "ปากซอยประชาชื่น 21", "แขวงบางซื่อ"],
+  25:["ถนนประชาชื่น", "ปากซอยประชาชื่น 25", "แขวงวงศ์สว่าง"],
+  26:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  27:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  28:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  29:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  30:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  31:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  32:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  33:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  34:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  35:["ถนนประชาชื่น", "", "แขวงวงศ์สว่าง"],
+  36:["ถนนประชาชื่น", "", "แขวงบางซื่อ"],
+  37:["ถนนประชาชื่น", "", "แขวงบางซื่อ"],
+  38:["ถนนประชาชื่น", "", "แขวงบางซื่อ"],
+  39:["ถนนประชาชื่น", "", "แขวงบางซื่อ"],
+};
 const DATA = {
   1:["ไม่มี", "ปกติ", null, null, "ดิจิตอล", "ปกติ", "มี", 1, "ป้ายหันด้านคนละด้านกับม้านั่งหรือจุดรอรถของประชาชน จึงไม่สามารถใช้งานได้จริง (ไม่ฟังก์ชั่น)"],
   2:["ไม่มี", "ปกติ", null, null, "เก่า", null, "ไม่มี", null, "ป้ายอยู่หลังสะพานลอย มองไม่เห็นรถ"],
@@ -1004,7 +1066,7 @@ const FIELDS = ["shelterForm","shelterStatus","chairsBroken","tempLamp","signFor
 const clean = v => { if (v == null) return null; const s = String(v).trim(); return (!s || s === "(None)") ? null : s; };
 const dms = s => { const m = s.match(/(\d+)°(\d+)'([\d.]+)"([NSEW])/); let v = +m[1] + m[2]/60 + m[3]/3600; return /[SW]/.test(m[4]) ? -v : v; };
 function applyFields(p, arr){ FIELDS.forEach((f,i) => p[f] = clean(arr[i])); }
-POINTS.forEach(p => { p.latD = dms(p.lat); p.lngD = dms(p.lng); p.photos = PHOTOS[p.id] || []; applyFields(p, DATA[p.id] || []); });
+POINTS.forEach(p => { [p.road, p.near, p.sub] = (ROADS[p.id] || ["","",""]); p.latD = dms(p.lat); p.lngD = dms(p.lng); p.photos = PHOTOS[p.id] || []; applyFields(p, DATA[p.id] || []); });
 
 const hasShelter = p => !!p.shelterForm && !/ไม่มี/.test(p.shelterForm);
 const lampBroken = p => hasShelter(p) && /ไฟ/.test(p.shelterStatus || "");
@@ -1048,7 +1110,7 @@ function hoverHtml(p){
   const img = ph ? `<img src="${toImg(ph,600)}" alt="รูปจุดที่ ${p.id}" loading="lazy" referrerpolicy="no-referrer" draggable="false">`
                  : `<div class="ph">ยังไม่มีรูปของจุดนี้</div>`;
   return `<div class="hc">${img}<div class="body">
-    <h4>จุดที่ ${p.id} · ${GROUPS[p.group].label}</h4>
+    <h4>จุดที่ ${p.id} · ${GROUPS[p.group].label}</h4>${p.road?`<span class="road">${esc([p.road, p.near].filter(Boolean).join(" · "))}</span>`:""}
     ${signText(p)?`<div class="row"><i style="background:${isDigital(p)?'var(--stop)':'var(--sign)'}"></i><span>${esc(signText(p))}</span></div>`:""}
     <div class="row"><i style="background:${hasShelter(p)?'var(--shelter)':'var(--muted)'}"></i><span>${esc(shelterText(p))}</span></div>
     ${lampText(p)?`<div class="row"><i style="background:${lampColor(p)}"></i><span>${esc(lampText(p))}</span></div>`:""}
@@ -1104,7 +1166,19 @@ const FILTERS = [
   {k:"chair", label:"เก้าอี้ชำรุด", color:"var(--shelter)"},
   {k:"digital", label:"ป้ายดิจิทัล", color:"var(--stop)"},
 ];
-const match = p => filter==="all" || p.group===filter || (filter==="lamp" && lampBroken(p)) || (filter==="chair" && chairBroken(p)) || (filter==="digital" && isDigital(p));
+const matchFilter = p => filter==="all" || p.group===filter || (filter==="lamp" && lampBroken(p)) || (filter==="chair" && chairBroken(p)) || (filter==="digital" && isDigital(p));
+/* ค้นหา: "จุด12" / "จุด 12" / "12" = เลขจุด, อย่างอื่น = ชื่อถนน ซอย แขวง หรือรายละเอียด (ไม่ต้องพิมพ์คำว่า ถนน) */
+let query = "";
+const squash = s => String(s || "").toLowerCase().replace(/\s+/g, "");
+function matchQuery(p){
+  const q = squash(query);
+  if (!q) return true;
+  const num = q.match(/^(?:จุดที่|จุด|จ\.|no\.?|#)?0*(\d+)$/);
+  if (num) return p.id === +num[1];
+  const term = q.replace(/^(ถนน|ถ\.|ซอย|ซ\.)/, "");
+  return [p.road, p.near, p.sub, p.detail, p.place, GROUPS[p.group].label].some(t => squash(t).includes(term));
+}
+const match = p => matchFilter(p) && matchQuery(p);
 function renderFilters(){
   const box = document.getElementById("filters");
   box.innerHTML = FILTERS.map(f => `<button type="button" class="chip" data-k="${f.k}" aria-pressed="${filter===f.k}">${f.color?`<span class="dot" style="background:${f.color}"></span>`:""}${f.label}</button>`).join("");
@@ -1130,9 +1204,9 @@ function renderList(){
       p.photos.length ? `<span class="tag">รูป ${p.photos.length}</span>` : "",
     ].join("");
     return `<div class="row-item${shown[p.id]?"":" off"}"><button type="button" class="item" data-id="${p.id}"><span class="num" style="background:${GROUPS[p.group].color}">${p.id}</span>
-      <span><h3>${esc(listTitle(p))}</h3><span class="tags">${tags}</span></span></button>
+      <span><h3>${esc(listTitle(p))}</h3><span class="road">${esc([p.road, p.near].filter(Boolean).join(" · "))}</span><span class="tags">${tags}</span></span></button>
       <button type="button" class="eye" data-id="${p.id}" aria-pressed="${shown[p.id]}" aria-label="${shown[p.id]?"ซ่อน":"แสดง"}จุดที่ ${p.id} บนแผนที่" title="${shown[p.id]?"ซ่อนบนแผนที่":"แสดงบนแผนที่"}">${shown[p.id]?EYE_ON:EYE_OFF}</button></div>`;
-  }).join("") || `<p class="sub" style="padding:12px">ไม่มีจุดที่ตรงกับตัวกรองนี้</p>`;
+  }).join("") || `<p class="sub" style="padding:12px">${query ? `ไม่พบจุดที่ตรงกับ “${esc(query)}” ลองพิมพ์เลขจุด เช่น จุด12 หรือชื่อถนน เช่น ประชาชื่น` : "ไม่มีจุดที่ตรงกับตัวกรองนี้"}</p>`;
   list.querySelectorAll(".item").forEach(b => {
     const p = POINTS.find(x => x.id == b.dataset.id);
     b.onclick = () => { if (!shown[p.id]) { setShown(p.id, true); renderList(); } setSheet(false); openDetail(p); focusPoint(p, 18); };
@@ -1140,11 +1214,15 @@ function renderList(){
     b.onmouseleave = () => markers[p.id].closeTooltip();
   });
   list.querySelectorAll(".eye").forEach(b => b.onclick = () => { setShown(+b.dataset.id, !shown[+b.dataset.id]); renderList(); });
-  const visible = POINTS.filter(match);
-  const allOn = visible.every(p => shown[p.id]);
-  const vt = document.getElementById("visAll");
-  vt.textContent = allOn ? "ซ่อนทั้งหมดบนแผนที่" : "แสดงทั้งหมดบนแผนที่";
-  vt.onclick = () => { visible.forEach(p => setShown(p.id, !allOn)); renderList(); };
+  /* ปุ่มแสดง/ซ่อนทั้งหมด: ใช้กับทุกจุดที่อยู่ในรายการตอนนี้ (ถ้ากรองหรือค้นหาอยู่ จะใช้กับจุดที่กรองอยู่เท่านั้น) */
+  const scoped = filter !== "all" || !!query;
+  const on = document.getElementById("visOn"), off = document.getElementById("visOff");
+  on.textContent  = scoped ? `แสดง ${rows.length} จุดที่กรองอยู่` : "แสดงทั้งหมด";
+  off.textContent = scoped ? `ซ่อน ${rows.length} จุดที่กรองอยู่` : "ซ่อนทั้งหมด";
+  on.disabled  = !rows.length || rows.every(p => shown[p.id]);
+  off.disabled = !rows.length || rows.every(p => !shown[p.id]);
+  on.onclick  = () => { rows.forEach(p => setShown(p.id, true));  renderList(); };
+  off.onclick = () => { rows.forEach(p => { setShown(p.id, false); if (openId === p.id) closeDetail(); }); renderList(); };
   document.getElementById("visCount").textContent = `แสดงบนแผนที่ ${POINTS.filter(p => shown[p.id]).length} จาก ${POINTS.length} จุด`;
   POINTS.forEach(p => { const el = markers[p.id].getElement()?.firstElementChild; if (el) el.classList.toggle("dim", !match(p)); });
 }
@@ -1173,6 +1251,8 @@ function openDetail(p){
         ${row("ศาลา", shelterText(p))}
         ${row("สถานะศาลา", shelterStatusText(p))}
         ${row("ไฟศาลา", lampText(p))}
+        ${row("ถนน", [p.road, p.near].filter(Boolean).join(" · "))}
+        ${row("แขวง", p.sub)}
         ${row("ที่ตั้ง", p.place)}
       </dl>
       ${p.detail?`<div class="note">${esc(p.detail)}</div>`:""}
@@ -1246,6 +1326,28 @@ handle.addEventListener("touchend", e => {
 map.on("click", () => { if (mqMobile.matches) { closeDetail(); setSheet(false); } });
 mqMobile.addEventListener("change", () => { setPeek(); setSheet(false); map.invalidateSize(); });
 window.addEventListener("resize", () => { setPeek(); });
+
+/* ================= ค้นหา ================= */
+const qEl = document.getElementById("q"), qClear = document.getElementById("qClear");
+qEl.addEventListener("input", () => { query = qEl.value.trim(); qClear.hidden = !qEl.value; renderList(); });
+qEl.addEventListener("keydown", e => {
+  if (e.key === "Escape") { qClear.click(); return; }
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const hits = POINTS.filter(match);
+  if (!hits.length) return;
+  if (mqMobile.matches) { qEl.blur(); setSheet(false); }
+  if (hits.length === 1) {
+    const p = hits[0];
+    if (!shown[p.id]) setShown(p.id, true);
+    renderList(); openDetail(p); focusPoint(p, 18);
+  } else {
+    hits.forEach(p => setShown(p.id, true)); renderList();
+    const peek = mqMobile.matches ? (parseInt(getComputedStyle(document.documentElement).getPropertyValue("--peek")) || 150) : 0;
+    map.fitBounds(L.latLngBounds(hits.map(p => [p.latD, p.lngD])), {paddingTopLeft:[30, 30], paddingBottomRight:[30, 30 + peek], maxZoom:18});
+  }
+});
+qClear.onclick = () => { qEl.value = ""; query = ""; qClear.hidden = true; renderList(); qEl.focus(); };
 
 renderStats(); renderFilters(); renderList();
 setSheet(false); setPeek(); fitAll();

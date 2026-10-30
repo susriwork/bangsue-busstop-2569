@@ -1341,7 +1341,7 @@ function hoverHtml(p){
   const img = ph ? `<div class="hcimg"><img src="${toImg(ph,600)}" alt="รูปจุดที่ ${p.id}" loading="lazy" referrerpolicy="no-referrer" draggable="false" style="${frameCss(FRAMES[ph])}"></div>`
                  : `<div class="ph">ยังไม่มีรูปของจุดนี้</div>`;
   return `<div class="hc">${img}<div class="body">
-    <h4>จุดที่ ${p.id} · ${GROUPS[p.group].label}</h4>${p.road?`<span class="road">${esc([p.road, p.near].filter(Boolean).join(" · "))}</span>`:""}
+    <h4>จุดที่ ${p.id} · ${GROUPS[p.group].label}</h4>${p.line?`<span class="road">${esc(p.line)}</span>`:""}
     ${signText(p)?`<div class="row"><i style="background:${isDigital(p)?'var(--stop)':'var(--sign)'}"></i><span>${esc(signText(p))}</span></div>`:""}
     <div class="row"><i style="background:${hasShelter(p)?'var(--shelter)':'var(--muted)'}"></i><span>${esc(shelterText(p))}</span></div>
     ${p.photos.length>1?`<small>มีรูปทั้งหมด ${p.photos.length} รูป · กดหมุดเพื่อดู</small>`:`<small>กดหมุดเพื่อดูรายละเอียด</small>`}
@@ -1444,7 +1444,7 @@ function matchQuery(p){
   const num = q.match(/^(?:จุดที่|จุด|จ\.|no\.?|#)?0*(\d+)$/);
   if (num) return p.id === +num[1];
   const term = q.replace(/^(ถนน|ถ\.|ซอย|ซ\.)/, "");
-  return [p.road, p.near, p.detail, p.place, GROUPS[p.group].label].some(t => squash(t).includes(term));
+  return [p.line, p.road, p.near, p.detail, p.place, GROUPS[p.group].label].some(t => squash(t).includes(term));
 }
 const match = p => matchFilter(p) && matchQuery(p) && (!selRoad || p.line === selRoad);
 function renderFilters(){
@@ -1462,7 +1462,6 @@ function renderFilters(){
 }
 function listTitle(p){
   if (p.detail) return p.detail;
-  if (p.place) return p.place;
   const bits = [];
   if (p.signStatus && p.signStatus !== "ปกติ") bits.push(`ป้าย${p.signStatus}`);
   if (shelterStatusText(p)) bits.push(shelterStatusText(p));
@@ -1480,7 +1479,7 @@ function renderList(){
       p.photos.length ? `<span class="tag">รูป ${p.photos.length}</span>` : "",
     ].join("");
     return `<div class="row-item${shown[p.id]?"":" off"}"><button type="button" class="item" data-id="${p.id}"><span class="num" style="background:${GROUPS[p.group].color}">${p.id}</span>
-      <span><h3>${esc(listTitle(p))}</h3><span class="road">${esc([p.road, p.near].filter(Boolean).join(" · "))}</span><span class="tags">${tags}</span></span></button>
+      <span><h3>${esc(listTitle(p))}</h3><span class="road">${esc(p.line || "")}</span><span class="tags">${tags}</span></span></button>
       <button type="button" class="eye" data-id="${p.id}" aria-pressed="${shown[p.id]}" aria-label="${shown[p.id]?"ซ่อน":"แสดง"}จุดที่ ${p.id} บนแผนที่" title="${shown[p.id]?"ซ่อนบนแผนที่":"แสดงบนแผนที่"}">${shown[p.id]?EYE_ON:EYE_OFF}</button></div>`;
   }).join("") || `<p class="sub" style="padding:12px">${query ? `ไม่พบจุดที่ตรงกับ “${esc(query)}” ลองพิมพ์เลขจุด เช่น จุด12 หรือชื่อถนน เช่น ประชาชื่น` : (fmode === "all" && filters.size > 1 ? "ไม่มีจุดที่ตรงครบทุกข้อที่เลือก ลองเปลี่ยนเป็น “ข้อใดข้อหนึ่ง”" : "ไม่มีจุดที่ตรงกับตัวกรองนี้")}</p>`;
   list.querySelectorAll(".item").forEach(b => {
@@ -1533,11 +1532,10 @@ function openDetail(p){
         ${row("ป้าย", signForm(p))}
         ${row("ศาลา", shelterText(p))}
         ${row("สถานะศาลา", shelterStatusText(p))}
-        ${row("ถนน", [p.road, p.near].filter(Boolean).join(" · "))}
-        ${row("ที่ตั้ง", p.place)}
+        ${row("ถนน", p.line)}
+        ${row("ที่ตั้ง", `${p.latD.toFixed(6)}, ${p.lngD.toFixed(6)}`)}
       </dl>
       ${p.detail?`<div class="note">${esc(p.detail)}</div>`:""}
-      <div class="coord">${p.latD.toFixed(6)}, ${p.lngD.toFixed(6)}</div>
       <div class="btns">
         <a class="btn" href="${gmaps(p)}" target="_blank" rel="noopener">เปิดใน Google Maps</a>
         ${PHOTO_API ? `<button type="button" class="btn edit">แก้ไขข้อมูล</button>` : ""}

@@ -1414,14 +1414,11 @@ function openDetail(p){
     <div class="scroll">
       ${gal}
       <dl>
-        ${row("กลุ่ม", GROUPS[p.group].label)}
         ${row("ป้าย", signForm(p))}
         ${row("สถานะป้าย", p.signStatus)}
         ${row("ศาลา", shelterText(p))}
         ${row("สถานะศาลา", shelterStatusText(p))}
-        ${row("ไฟศาลา", lampText(p))}
         ${row("ถนน", [p.road, p.near].filter(Boolean).join(" · "))}
-        ${row("แขวง", p.sub)}
         ${row("ที่ตั้ง", p.place)}
       </dl>
       ${p.detail?`<div class="note">${esc(p.detail)}</div>`:""}

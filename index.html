@@ -1377,8 +1377,8 @@ function selectRoad(name){
 function renderRoads(){
   const box = document.getElementById("roads");
   box.innerHTML = `<span class="lbl">ถนน</span>` +
-    `<button type="button" class="chip" data-r="" aria-pressed="${!selRoad}">ทุกถนน</button>` +
-    ROAD_LINES.map(r => `<button type="button" class="chip" data-r="${esc(r.name)}" aria-pressed="${selRoad === r.name}"><span class="bar" style="background:${r.color}"></span>${esc(r.name.replace(/^ถนน/, ""))} <small class="cnt">${POINTS.filter(p => p.line === r.name).length} จุด</small></button>`).join("");
+    `<button type="button" class="chip" data-r="" aria-pressed="${!selRoad}">ทุกถนน <small class="cnt">${POINTS.filter(p => matchFilter(p) && matchQuery(p)).length} จุด</small></button>` +
+    ROAD_LINES.map(r => `<button type="button" class="chip" data-r="${esc(r.name)}" aria-pressed="${selRoad === r.name}"><span class="bar" style="background:${r.color}"></span>${esc(r.name.replace(/^ถนน/, ""))} <small class="cnt">${POINTS.filter(p => p.line === r.name && matchFilter(p) && matchQuery(p)).length} จุด</small></button>`).join("");
   box.querySelectorAll(".chip").forEach(b => b.onclick = () => selectRoad(b.dataset.r || null));
 }
 const shown = {};
@@ -1415,11 +1415,14 @@ function setShown(id, on){
 /* ตัวกรองเลือกได้หลายข้อ: ว่าง = ทั้งหมด, fmode "any" = ตรงข้อใดข้อหนึ่ง, "all" = ตรงครบทุกข้อ */
 const filters = new Set();
 let fmode = "any";
+/* ตัวเลขสถิตินับจากจุดที่ตรงกับตัวกรอง ถนน และคำค้นที่เลือกอยู่ */
 function renderStats(){
-  const broken = POINTS.filter(lampBroken);
-  const chairs = POINTS.filter(chairBroken);
+  const scoped = filters.size > 0 || !!query || !!selRoad;
+  const rows = POINTS.filter(match);
+  const broken = rows.filter(lampBroken);
+  const chairs = rows.filter(chairBroken);
   document.getElementById("stats").innerHTML = `
-    <div class="stat"><b>${POINTS.length}</b><span>จุดพักรอทั้งหมด</span></div>
+    <div class="stat"><b>${rows.length}</b><span>${scoped ? "จุดที่กรองอยู่" : "จุดพักรอทั้งหมด"}</span></div>
     <div class="stat"><b>${broken.length}</b><span>ศาลาไฟชำรุด</span></div>
     <div class="stat"><b>${chairs.length}</b><span>ศาลาเก้าอี้ชำรุด</span></div>`;
 }
@@ -1472,6 +1475,7 @@ function listTitle(p){
   return bits.join(" · ") || GROUPS[p.group].label;
 }
 function renderList(){
+  renderStats(); renderRoads();
   const list = document.getElementById("list");
   const rows = POINTS.filter(match);
   list.innerHTML = rows.map(p => {

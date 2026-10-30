@@ -799,6 +799,9 @@ dd{margin:0}
 .coord{font:400 12.5px var(--f-mono);color:var(--muted)}
 .btns{display:flex;flex-wrap:wrap;gap:8px}
 .btn{font:500 13px var(--f-body);text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;background:var(--card);cursor:pointer}
+.btn.up{display:inline-flex;align-items:center;gap:6px}
+.up-status{font-size:13px;color:var(--muted);margin-top:8px}
+.up-status.err{color:var(--alert-ink)}
 .btn.primary{background:var(--stop);border-color:var(--stop);color:#fff}
 .legend{background:var(--card);color:var(--ink);border-radius:8px;font:12px var(--f-body);box-shadow:0 2px 8px rgba(0,0,0,.25);overflow:hidden}
 .legend summary{cursor:pointer;padding:6px 10px;font-weight:600;list-style:none;display:flex;align-items:center;gap:6px}
@@ -1221,6 +1224,8 @@ const ROAD_LINES = [
   {name:"ถนนประชาราษฎร์สาย 2", color:"#00796b", coords:[[13.805712,100.533062],[13.806379,100.530838],[13.806365,100.519792]]},
 ];
 const ROAD_NEAR_M = 50; /* จุดที่ห่างเส้นถนนไม่เกินระยะนี้ นับว่าอยู่บนถนนนั้น (ใช้กับปุ่มเลือกถนนเท่านั้น) */
+/* ลิงก์ Web app ของ Google Apps Script ที่ผูกกับชีต (ใส่หลังติดตั้งสคริปต์) ว่างไว้ = ปิดปุ่มเพิ่มรูป */
+const PHOTO_API = "";
 const FIELDS = ["shelterForm","shelterStatus","chairsBroken","tempLamp","signForm","signStatus","bench","benchN","detail"];
 
 /* ================= helpers ================= */
@@ -1479,13 +1484,64 @@ function openDetail(p){
       <div class="coord">${p.latD.toFixed(6)}, ${p.lngD.toFixed(6)}</div>
       <div class="btns">
         <a class="btn" href="${gmaps(p)}" target="_blank" rel="noopener">เปิดใน Google Maps</a>
+        ${PHOTO_API ? `<label class="btn primary up">เพิ่มรูป<input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label>` : ""}
       </div>
+      <div class="up-status" aria-live="polite" hidden></div>
     </div>`;
   drawer.hidden = false;
   if (mqMobile.matches) setSheet(false);
   drawer.querySelector(".scroll").scrollTop = 0;
   drawer.querySelector(".x").onclick = closeDetail;
   drawer.querySelectorAll(".shot").forEach(b => b.onclick = () => openLightbox(p, +b.dataset.i));
+  const inp = drawer.querySelector(".up input");
+  if (inp) inp.onchange = () => { uploadPhotos(p, [...inp.files]); inp.value = ""; };
+}
+
+/* ================= เพิ่มรูป (ผ่าน Google Apps Script) ================= */
+/* ย่อรูปในเครื่องก่อนส่ง ด้านยาวสุด 1600px เป็น JPG เพื่อให้ส่งเร็วและไม่เปลืองพื้นที่ Drive */
+function shrink(file, max = 1600){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", .85).split(",")[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("เปิดไฟล์รูปนี้ไม่ได้")); };
+    img.src = url;
+  });
+}
+async function uploadPhotos(p, files){
+  const st = () => openId === p.id ? drawer.querySelector(".up-status") : null;
+  const say = (t, err) => { const el = st(); if (el) { el.hidden = false; el.textContent = t; el.classList.toggle("err", !!err); } };
+  const btn = drawer.querySelector(".up"); if (btn) btn.style.pointerEvents = "none";
+  let ok = 0, fail = "";
+  for (let i = 0; i < files.length; i++) {
+    say(`กำลังอัปโหลดรูป ${i+1}/${files.length}…`);
+    try {
+      const data = await shrink(files[i]);
+      const r = await fetch(PHOTO_API, {method:"POST", body: JSON.stringify({id:p.id, mime:"image/jpeg", data})}).then(r => r.json());
+      if (!r.ok) throw new Error(r.error || "อัปโหลดไม่สำเร็จ");
+      if (!p.photos.includes(r.fileId)) p.photos.push(r.fileId);
+      ok++;
+    } catch (e) { fail = e.message || "อัปโหลดไม่สำเร็จ"; }
+  }
+  renderList();
+  if (openId === p.id) openDetail(p);
+  say(fail ? `อัปโหลดสำเร็จ ${ok} จาก ${files.length} รูป · ${fail}` : `อัปโหลดสำเร็จ ${ok} รูป`, !!fail);
+}
+/* โหลดรายการรูปล่าสุดจากชีต รวมกับรูปที่ฝังไว้ในไฟล์ */
+function loadSheetPhotos(){
+  if (!PHOTO_API) return;
+  fetch(PHOTO_API).then(r => r.json()).then(j => {
+    if (!j || !j.ok) return;
+    let changed = false;
+    POINTS.forEach(p => (j.photos[p.id] || []).forEach(id => { if (!p.photos.includes(id)) { p.photos.push(id); changed = true; } }));
+    if (changed) { renderList(); const o = POINTS.find(p => p.id === openId); if (o) openDetail(o); }
+  }).catch(() => {});
 }
 function closeDetail(){ openId = null; drawer.hidden = true; document.querySelectorAll(".item.active").forEach(e => e.classList.remove("active")); }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDetail(); });
@@ -1569,7 +1625,7 @@ qEl.addEventListener("keydown", e => {
 });
 qClear.onclick = () => { qEl.value = ""; query = ""; qClear.hidden = true; renderList(); qEl.focus(); };
 
-renderStats(); renderFilters(); renderRoads(); renderList();
+renderStats(); renderFilters(); renderRoads(); renderList(); loadSheetPhotos();
 setSheet(false); setPeek(); fitAll();
 if (document.fonts) document.fonts.ready.then(() => { setPeek(); });
 </script>

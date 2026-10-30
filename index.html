@@ -807,7 +807,10 @@ h1{font:700 21px/1.3 var(--f-display);margin:8px 0 4px;text-wrap:balance}
 .gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
 .gallery .shot{display:block;aspect-ratio:4/3;max-width:100%;border-radius:8px;overflow:hidden;background:var(--paper);border:0;padding:0;cursor:zoom-in}
 .gallery img{width:100%;height:100%;object-fit:cover}
-.gallery .shot:first-child:last-child{grid-column:1/-1}
+.gallery .shotwrap{position:relative}
+.gallery .shotwrap .shot{width:100%}
+.gallery .shotwrap:first-child:last-child{grid-column:1/-1}
+.delph{position:absolute;right:6px;bottom:6px;font:600 12px var(--f-body);background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:6px;padding:4px 8px;cursor:pointer}
 dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px}
 dt{color:var(--muted)}
 dd{margin:0}
@@ -1489,7 +1492,7 @@ function openDetail(p){
   openId = p.id;
   document.querySelectorAll(".item").forEach(el => el.classList.toggle("active", el.dataset.id == p.id));
   const gal = p.photos.length
-    ? `<div class="gallery">${p.photos.map((ph,i) => `<button type="button" class="shot" data-i="${i}" aria-label="ขยายรูปที่ ${i+1}"><img src="${toImg(ph)}" alt="รูปที่ ${i+1} จุดที่ ${p.id}" loading="lazy" referrerpolicy="no-referrer" draggable="false"></button>`).join("")}</div>`
+    ? `<div class="gallery">${p.photos.map((ph,i) => `<div class="shotwrap"><button type="button" class="shot" data-i="${i}" aria-label="ขยายรูปที่ ${i+1}"><img src="${toImg(ph)}" alt="รูปที่ ${i+1} จุดที่ ${p.id}" loading="lazy" referrerpolicy="no-referrer" draggable="false"></button>${PHOTO_API ? `<button type="button" class="delph" data-f="${esc(ph)}" aria-label="ลบรูปที่ ${i+1}" title="ลบรูปนี้">ลบรูป</button>` : ""}</div>`).join("")}</div>`
     : `<div class="note">ยังไม่มีรูปของจุดที่ ${p.id}</div>`;
   const row = (k, v) => v ? `<dt>${k}</dt><dd>${esc(v)}</dd>` : "";
   drawer.innerHTML = `
@@ -1508,6 +1511,7 @@ function openDetail(p){
       <div class="coord">${p.latD.toFixed(6)}, ${p.lngD.toFixed(6)}</div>
       <div class="btns">
         <a class="btn" href="${gmaps(p)}" target="_blank" rel="noopener">เปิดใน Google Maps</a>
+        ${PHOTO_API ? `<button type="button" class="btn edit">แก้ไขข้อมูล</button>` : ""}
         ${PHOTO_API ? `<label class="btn primary up">เพิ่มรูป<input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label>` : ""}
       </div>
       <div class="up-status" aria-live="polite" hidden></div>
@@ -1517,6 +1521,8 @@ function openDetail(p){
   drawer.querySelector(".scroll").scrollTop = 0;
   drawer.querySelector(".x").onclick = closeDetail;
   drawer.querySelectorAll(".shot").forEach(b => b.onclick = () => openLightbox(p, +b.dataset.i));
+  const ed = drawer.querySelector(".btn.edit"); if (ed) ed.onclick = () => startEdit(p);
+  drawer.querySelectorAll(".delph").forEach(b => b.onclick = () => deletePhoto(p, b.dataset.f));
   const inp = drawer.querySelector(".up input");
   if (inp) inp.onchange = () => { uploadPhotos(p, [...inp.files]); inp.value = ""; };
 }
@@ -1557,6 +1563,18 @@ async function uploadPhotos(p, files){
   if (openId === p.id) openDetail(p);
   say(fail ? `อัปโหลดสำเร็จ ${ok} จาก ${files.length} รูป · ${fail}` : `อัปโหลดสำเร็จ ${ok} รูป`, !!fail);
 }
+async function deletePhoto(p, fid){
+  if (!confirm(`ลบรูปนี้ออกจากจุดที่ ${p.id}?\n(ลิงก์จะถูกลบออกจากชีต ไฟล์ใน Google Drive ยังอยู่)`)) return;
+  const say = (t, err) => { const el = openId === p.id ? drawer.querySelector(".up-status") : null; if (el) { el.hidden = false; el.textContent = t; el.classList.toggle("err", !!err); } };
+  say("กำลังลบรูป…");
+  try {
+    const r = await fetch(PHOTO_API, {method:"POST", body: JSON.stringify({action:"deletePhoto", id:p.id, fileId:fid})}).then(r => r.json());
+    if (!r.ok) throw new Error(r.error || "ลบรูปไม่สำเร็จ");
+    p.photos = p.photos.filter(x => x !== fid);
+    renderList(); if (openId === p.id) openDetail(p);
+    say("ลบรูปแล้ว");
+  } catch (e) { say(e.message || "ลบรูปไม่สำเร็จ", true); }
+}
 /* โหลดรายการรูปล่าสุดจากชีต แล้วใช้แทนรูปที่ฝังไว้ในไฟล์ (ลบลิงก์ในชีต = รูปหายจากเว็บ)
    ถ้าโหลดจากชีตไม่ได้ จะใช้รูปที่ฝังไว้ในไฟล์ตามเดิม */
 function loadSheetPhotos(){
@@ -1564,12 +1582,17 @@ function loadSheetPhotos(){
   fetch(PHOTO_API, {cache:"no-store"}).then(r => r.json()).then(j => {
     if (!j || !j.ok || !j.photos) return;
     let changed = false;
-    (j.points || []).forEach(n => { if (!POINTS.some(p => p.id === n.id)) { addPoint(n, j.photos[n.id] || []); changed = true; } });
+    const F = j.fields || {};
+    POINTS.forEach(p => { const f = F[p.id]; if (f && f.some(v => v != null && v !== "")) { applyFields(p, f); changed = true; } });
+    (j.points || []).forEach(n => {
+      const p = POINTS.find(x => x.id === n.id);
+      if (p) { applyEdit(p, n); changed = true; } else { addPoint(n, j.photos[n.id] || []); changed = true; }
+    });
     POINTS.forEach(p => {
       const next = (j.photos[p.id] || []).slice();
       if (next.join() !== p.photos.join()) { p.photos = next; changed = true; }
     });
-    if (changed) { renderStats(); renderRoads(); renderList(); const o = POINTS.find(p => p.id === openId); if (o) openDetail(o); }
+    if (changed) { POINTS.forEach(p => markers[p.id].setIcon(iconFor(p))); renderStats(); renderRoads(); renderList(); const o = POINTS.find(p => p.id === openId); if (o) openDetail(o); }
   }).catch(() => {});
 }
 
@@ -1584,10 +1607,19 @@ function addPoint(n, photos){
   POINTS.push(p); shown[p.id] = true; addMarker(p);
   return p;
 }
+/* ใช้ตำแหน่ง/กลุ่ม/ที่ตั้ง/ถนน ที่แก้ไว้ในชีต กับจุดที่มีอยู่แล้ว */
+function applyEdit(p, n){
+  if (GROUP_BY_LABEL[n.group]) p.group = GROUP_BY_LABEL[n.group];
+  if (isFinite(+n.lat) && +n.lat) { p.latD = +n.lat; p.lngD = +n.lng; markers[p.id].setLatLng([p.latD, p.lngD]); }
+  p.place = n.place || ""; if (n.road) p.road = n.road;
+  if (n.f && n.f.some(v => v != null && v !== "")) applyFields(p, n.f);
+  p.line = nearestLine(p.latD, p.lngD);
+}
 const OPTS = {
   signForm:["ไม่มี","เก่า","ใหม่","ดิจิตอล"], signStatus:["ปกติ","เลือนลาง","โดนบดบัง","ชำรุด"],
   shelterForm:["ไม่มี","เก่า","ใหม่"], shelterStatus:["ปกติ","ไฟส่องสว่างชำรุด","เก้าอี้ชำรุด","โครงสร้างชำรุด"],
   yesno:["มี","ไม่มี"],
+  signStatusAll:["ปกติ","เลือนลาง","โดนบดบัง","ชำรุด","ไม่มีข้อมูล"],
 };
 let draft = null; /* {latlng, marker, form} */
 const pickBar = document.createElement("div");
@@ -1603,8 +1635,26 @@ function setPicking(on){
 function startAdd(){
   if (draft) cancelDraft();
   closeDetail();
-  draft = {};
+  draft = {mode:"add"};
   setPicking(true);
+}
+function startEdit(p){
+  if (draft) cancelDraft();
+  const id = p.id;
+  closeDetail();
+  draft = {mode:"edit", p, latlng: L.latLng(p.latD, p.lngD)};
+  draft.marker = L.marker(draft.latlng, {icon:draftIcon(), draggable:true, zIndexOffset:1000}).addTo(map);
+  draft.marker.on("dragend", () => { draft.latlng = draft.marker.getLatLng(); updateDraftCoords(); });
+  openAddForm();
+  const f = draft.form;
+  f.group.value = p.group; f.place.value = p.place || ""; f.road.value = p.road || ""; f.road.dataset.touched = "1";
+  const setSel = (el, v) => { v = v == null ? "" : String(v); if (v && ![...el.options].some(o => o.value === v)) el.add(new Option(v, v)); el.value = v; };
+  setSel(f.signForm, p.signForm); setSel(f.signStatus, p.signStatus); setSel(f.shelterForm, p.shelterForm);
+  const st = String(p.shelterStatus || "").split(",").map(x => x.trim());
+  f.querySelectorAll("[name=shelterStatus]").forEach(i => i.checked = st.includes(i.value));
+  f.chairsBroken.value = p.chairsBroken || ""; setSel(f.tempLamp, p.tempLamp); setSel(f.bench, p.bench);
+  f.benchN.value = p.benchN || ""; f.detail.value = p.detail || "";
+  f.dispatchEvent(new Event("change"));
 }
 const draftIcon = () => L.divIcon({className:"", iconSize:[32,40], iconAnchor:[16,40],
   html:`<div class="pin draft" style="--pc:${draft && draft.form ? GROUPS[draft.form.querySelector("[name=group]").value]?.color || "var(--party)" : "var(--party)"}">${BUS_SVG}</div>`});
@@ -1628,22 +1678,24 @@ function updateDraftCoords(){
 }
 function cancelDraft(){
   if (!draft) return;
+  const back = draft.mode === "edit" && draft.form ? draft.p : null;
   if (draft.marker) map.removeLayer(draft.marker);
   draft = null; setPicking(false);
+  if (back && openId == null) { openDetail(back); return; }
   if (openId == null) drawer.hidden = true;
 }
 function openAddForm(){
   openId = null;
   const sel = (name, opts, blank = "ไม่ได้ระบุ") => `<select name="${name}"><option value="">${blank}</option>${opts.map(o => `<option>${o}</option>`).join("")}</select>`;
   drawer.innerHTML = `
-    <header><h2>เพิ่มหมุดใหม่</h2><button type="button" class="x" aria-label="ยกเลิก">×</button></header>
+    <header><h2>${draft.mode === "edit" ? `แก้ไขข้อมูลจุดที่ ${draft.p.id}` : "เพิ่มหมุดใหม่"}</h2><button type="button" class="x" aria-label="ยกเลิก">×</button></header>
     <form class="scroll addform" novalidate>
       <label><span>กลุ่ม <b class="req">*</b></span><select name="group" required><option value="">เลือกกลุ่ม</option>${Object.entries(GROUPS).map(([k,g]) => `<option value="${k}">${g.label}</option>`).join("")}</select></label>
       <label>ชื่อที่ตั้ง<input name="place" maxlength="200" placeholder="เช่น หน้าวัดน้อย"></label>
       <label>ถนน<input name="road" maxlength="200" list="roadList"><datalist id="roadList">${ROAD_LINES.map(r => `<option>${r.name}</option>`).join("")}</datalist></label>
       <fieldset><legend>ป้าย</legend>
         <label>รูปแบบป้าย${sel("signForm", OPTS.signForm)}</label>
-        <label>สถานะป้าย${sel("signStatus", OPTS.signStatus)}</label>
+        <label>สถานะป้าย${sel("signStatus", OPTS.signStatusAll)}</label>
       </fieldset>
       <fieldset><legend>ศาลา</legend>
         <label>รูปแบบศาลา${sel("shelterForm", OPTS.shelterForm)}</label>
@@ -1656,9 +1708,9 @@ function openAddForm(){
         <label data-if="bench" hidden>จำนวนม้านั่ง (ตัว)<input name="benchN" type="number" min="1" max="99" inputmode="numeric"></label>
       </fieldset>
       <label>รายละเอียดเพิ่มเติม<textarea name="detail" rows="3" maxlength="500"></textarea></label>
-      <label>รูป (เลือกได้หลายรูป)<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+      ${draft.mode === "edit" ? "" : `<label>รูป (เลือกได้หลายรูป)<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>`}
       <div class="coord">ตำแหน่ง: <span class="draft-coord"></span><br><button type="button" class="linkbtn move">ย้ายตำแหน่ง</button>${isTouch ? "" : " หรือลากหมุดสีส้มบนแผนที่"}</div>
-      <div class="btns"><button type="submit" class="btn primary">บันทึกหมุด</button><button type="button" class="btn cancel">ยกเลิก</button></div>
+      <div class="btns"><button type="submit" class="btn primary">${draft.mode === "edit" ? "บันทึกการแก้ไข" : "บันทึกหมุด"}</button><button type="button" class="btn cancel">ยกเลิก</button></div>
       <div class="up-status" aria-live="polite" hidden></div>
     </form>`;
   drawer.hidden = false;
@@ -1690,18 +1742,23 @@ async function submitDraft(f){
     signForm:f.signForm.value, signStatus:f.signStatus.value, bench:f.bench.value, benchN:f.benchN.value, detail:f.detail.value.trim(),
   };
   const btn = f.querySelector("[type=submit]"); btn.disabled = true;
-  say("กำลังบันทึกหมุด…");
+  say("กำลังบันทึก…");
   try {
     const {lat, lng} = draft.latlng;
-    const body = {action:"addPoint", lat, lng, group:GROUPS[f.group.value].label, place:f.place.value.trim(), road:f.road.value.trim(), f:vals};
+    const edit = draft.mode === "edit";
+    const body = {action: edit ? "updatePoint" : "addPoint", id: edit ? draft.p.id : undefined, lat, lng,
+                  group:GROUPS[f.group.value].label, place:f.place.value.trim(), road:f.road.value.trim(), f:vals};
     const r = await fetch(PHOTO_API, {method:"POST", body: JSON.stringify(body)}).then(r => r.json());
     if (!r.ok) throw new Error(r.error || "บันทึกไม่สำเร็จ");
     const num = v => { const n = parseInt(v, 10); return n > 0 ? n : null; };
-    const files = [...f.photos.files];
-    const p = addPoint({id:r.id, lat, lng, group:body.group, place:body.place, road:body.road, f:[
-      vals.shelterForm, statuses.join(", "), statuses.includes("เก้าอี้ชำรุด") ? num(vals.chairsBroken) : null,
-      statuses.includes("ไฟส่องสว่างชำรุด") ? vals.tempLamp : null, vals.signForm, vals.signStatus, vals.bench,
-      vals.bench === "มี" ? num(vals.benchN) : null, vals.detail]}, []);
+    const files = f.photos ? [...f.photos.files] : [];
+    const n = {id:r.id, lat, lng, group:body.group, place:body.place, road:body.road, f:[
+      vals.shelterForm || null, statuses.join(", ") || null, statuses.includes("เก้าอี้ชำรุด") ? num(vals.chairsBroken) : null,
+      statuses.includes("ไฟส่องสว่างชำรุด") ? vals.tempLamp || null : null, vals.signForm || null, vals.signStatus || null, vals.bench || null,
+      vals.bench === "มี" ? num(vals.benchN) : null, vals.detail || null]};
+    let p;
+    if (edit) { p = draft.p; applyFields(p, n.f); n.f = null; applyEdit(p, n); if (!body.road) p.road = ""; markers[p.id].setIcon(iconFor(p)); }
+    else p = addPoint(n, []);
     map.removeLayer(draft.marker); draft = null;
     renderStats(); renderRoads(); renderList();
     openDetail(p); focusPoint(p);

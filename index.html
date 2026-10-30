@@ -1501,7 +1501,6 @@ function openDetail(p){
       ${gal}
       <dl>
         ${row("ป้าย", signForm(p))}
-        ${row("สถานะป้าย", p.signStatus)}
         ${row("ศาลา", shelterText(p))}
         ${row("สถานะศาลา", shelterStatusText(p))}
         ${row("ถนน", [p.road, p.near].filter(Boolean).join(" · "))}

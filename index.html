@@ -1427,12 +1427,16 @@ const FILTERS = [
   {k:"all", label:"ทั้งหมด"},
   ...Object.entries(GROUPS).map(([k,g]) => ({k, label:g.label, color:g.color})),
   {k:"chair", label:"เก้าอี้ชำรุด", color:"var(--shelter)"},
+  {k:"other", label:"อื่นๆ (นอกจากชำรุด/ย้ายจุด)", color:"var(--muted)"},
   {k:"digital", label:"ป้ายดิจิทัล", color:"var(--stop)"},
   {k:"nophoto", label:"ยังไม่มีรูป", color:"var(--muted)"},
 ];
 const FILTER_TEST = {
   ...Object.fromEntries(Object.keys(GROUPS).map(k => [k, p => p.group === k])),
-  chair: p => chairBroken(p), digital: p => isDigital(p), nophoto: p => !p.photos.length,
+  chair: p => chairBroken(p),
+  /* นอกเหนือจาก ป้ายเก่าชำรุด / ศาลาเก่าชำรุด / เก้าอี้ชำรุด / ควรปรับแก้-ย้ายจุด */
+  other: p => !["sign","shelter","move"].includes(p.group) && !chairBroken(p),
+  digital: p => isDigital(p), nophoto: p => !p.photos.length,
 };
 const matchFilter = p => !filters.size || (fmode === "all" ? [...filters].every(k => FILTER_TEST[k](p)) : [...filters].some(k => FILTER_TEST[k](p)));
 /* ค้นหา: "จุด12" / "จุด 12" / "12" = เลขจุด, อย่างอื่น = ชื่อถนน ซอย แขวง หรือรายละเอียด (ไม่ต้องพิมพ์คำว่า ถนน) */

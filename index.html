@@ -1425,7 +1425,7 @@ function openDetail(p){
         ${row("ที่ตั้ง", p.place)}
       </dl>
       ${p.detail?`<div class="note">${esc(p.detail)}</div>`:""}
-      <div class="coord">${esc(p.lat)} ${esc(p.lng)}<br>${p.latD.toFixed(6)}, ${p.lngD.toFixed(6)}</div>
+      <div class="coord">${p.latD.toFixed(6)}, ${p.lngD.toFixed(6)}</div>
       <div class="btns">
         <a class="btn" href="${gmaps(p)}" target="_blank" rel="noopener">เปิดใน Google Maps</a>
       </div>

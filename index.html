@@ -1638,7 +1638,7 @@ function openAddForm(){
   drawer.innerHTML = `
     <header><h2>เพิ่มหมุดใหม่</h2><button type="button" class="x" aria-label="ยกเลิก">×</button></header>
     <form class="scroll addform" novalidate>
-      <label>กลุ่ม <b class="req">*</b><select name="group" required><option value="">เลือกกลุ่ม</option>${Object.entries(GROUPS).map(([k,g]) => `<option value="${k}">${g.label}</option>`).join("")}</select></label>
+      <label><span>กลุ่ม <b class="req">*</b></span><select name="group" required><option value="">เลือกกลุ่ม</option>${Object.entries(GROUPS).map(([k,g]) => `<option value="${k}">${g.label}</option>`).join("")}</select></label>
       <label>ชื่อที่ตั้ง<input name="place" maxlength="200" placeholder="เช่น หน้าวัดน้อย"></label>
       <label>ถนน<input name="road" maxlength="200" list="roadList"><datalist id="roadList">${ROAD_LINES.map(r => `<option>${r.name}</option>`).join("")}</datalist></label>
       <fieldset><legend>ป้าย</legend>

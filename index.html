@@ -1311,10 +1311,11 @@ const FILTERS = [
   ...Object.entries(GROUPS).map(([k,g]) => ({k, label:g.label, color:g.color})),
   {k:"chair", label:"เก้าอี้ชำรุด", color:"var(--shelter)"},
   {k:"digital", label:"ป้ายดิจิทัล", color:"var(--stop)"},
+  {k:"nophoto", label:"ยังไม่มีรูป", color:"var(--muted)"},
 ];
 const FILTER_TEST = {
   ...Object.fromEntries(Object.keys(GROUPS).map(k => [k, p => p.group === k])),
-  chair: p => chairBroken(p), digital: p => isDigital(p),
+  chair: p => chairBroken(p), digital: p => isDigital(p), nophoto: p => !p.photos.length,
 };
 const matchFilter = p => !filters.size || (fmode === "all" ? [...filters].every(k => FILTER_TEST[k](p)) : [...filters].some(k => FILTER_TEST[k](p)));
 /* ค้นหา: "จุด12" / "จุด 12" / "12" = เลขจุด, อย่างอื่น = ชื่อถนน ซอย แขวง หรือรายละเอียด (ไม่ต้องพิมพ์คำว่า ถนน) */

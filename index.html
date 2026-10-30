@@ -683,6 +683,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
   --sign:#2aa598;         /* ป้ายชำรุด: เขียวมิ้นต์อมฟ้า */
   --shelter:#4b8fd6;      /* ศาลาชำรุด: ฟ้าใส */
   --move:#8a7ee0;         /* ควรย้าย/ปรับจุด: ม่วงลาเวนเดอร์ */
+  --sign-old:#6b7a84;     /* ป้ายเก่า (ไม่ได้ระบุว่าชำรุด): เทาอมฟ้า */
+  --shelter-ok:#a8864f;   /* ศาลาเก่าปกติ: น้ำตาลทราย */
+  --sign-new:#3f9a4a;     /* ป้ายใหม่: เขียว */
+  --shelter-new:#b0699f;  /* ศาลาใหม่: ชมพูอมม่วง */
   --lamp-off:#f0716a;     /* จุดไฟชำรุด: ส้มคอรัลอ่อน */
   --alert-ink:#b83c35;
   --party:#ff6a00;        /* ส้มพรรคประชาชน (ตามเว็บไซต์ peoplesparty.or.th) */    /* ตัวอักษรแท็กชำรุด */
@@ -875,7 +879,7 @@ img{-webkit-user-drag:none}
     <div class="fmode" id="fmode" role="group" aria-label="วิธีรวมตัวกรอง" hidden><span>แสดงจุดที่ตรงกับ</span><button type="button" data-m="any">ข้อใดข้อหนึ่ง</button><button type="button" data-m="all">ครบทุกข้อ</button></div>
     <div class="visbar"><span id="visCount"></span><span class="vis-btns"><button type="button" id="visOn" class="vis-all"></button><button type="button" id="visOff" class="vis-all"></button></span></div>
     <div class="list" id="list"></div>
-    <div class="foot">ข้อมูล ณ 15 ต.ค. 2569 · พิกัดจากการสำรวจภาคสนาม ก.ย. 2569</div>
+    <div class="foot">จุดที่ 1–39 ข้อมูล ณ 15 ต.ค. 2569 · จุดที่ 40–102 เพิ่มจาก Google Maps 30 ต.ค. 2569 (ยังไม่มีรูปและรายละเอียด) · พิกัดจากการสำรวจภาคสนาม ก.ย. 2569</div>
   </aside>
   <div class="mapwrap">
     <div id="map" aria-label="แผนที่จุดสำรวจ"></div>
@@ -902,7 +906,13 @@ const GROUPS = {
   sign:   {label:"ป้ายเก่าชำรุด",        color:"var(--sign)"},
   shelter:{label:"ศาลาเก่าชำรุด",        color:"var(--shelter)"},
   move:   {label:"ควรปรับแก้/ย้ายจุด",   color:"var(--move)"},
+  signOld:   {label:"ป้ายเก่า",        color:"var(--sign-old)"},
+  shelterOk: {label:"ศาลาเก่าปกติ",    color:"var(--shelter-ok)"},
+  signNew:   {label:"ป้ายใหม่",        color:"var(--sign-new)"},
+  shelterNew:{label:"ศาลาใหม่",        color:"var(--shelter-new)"},
 };
+/* กลุ่มที่นับเป็น "จุดที่ควรปรับปรุง" */
+const NEEDS_FIX = new Set(["sign","shelter","move"]);
 const POINTS = [
   {id:1, group:"move", lat:`13°48'22.36"N`, lng:`100°31'54.67"E`},
   {id:2, group:"move", lat:`13°48'23.59"N`, lng:`100°31'32.18"E`},
@@ -943,6 +953,70 @@ const POINTS = [
   {id:37, group:"shelter", lat:`13°48'46.98"N`, lng:`100°32'06.23"E`},
   {id:38, group:"shelter", lat:`13°48'40.10"N`, lng:`100°32'04.60"E`},
   {id:39, group:"shelter", lat:`13°48'25.08"N`, lng:`100°32'00.95"E`, tempCount:1},
+  // จุดที่ 40–102: เพิ่มจากรายการบันทึกใน Google Maps (30 ต.ค. 2569) ยังไม่มีรูป ถนน และรายละเอียดจากชีต
+  {id:40, group:"sign", lat:`13°49'52.21"N`, lng:`100°31'30.30"E`, place:"วัดทองสุทธาราม"},
+  {id:41, group:"sign", lat:`13°49'57.64"N`, lng:`100°31'24.05"E`, place:"ตรงข้ามวัดเลียบราษฎร์บำรุง"},
+  {id:42, group:"sign", lat:`13°49'15.10"N`, lng:`100°31'56.89"E`, place:"ตลาดบางซ่อน"},
+  {id:43, group:"shelter", lat:`13°49'58.14"N`, lng:`100°32'22.20"E`, place:"รพ.เกษมราษฎร์ ประชาชื่น"},
+  {id:44, group:"shelter", lat:`13°48'28.64"N`, lng:`100°31'51.37"E`, place:"หลังแยกเตาปูน"},
+  {id:45, group:"shelter", lat:`13°48'23.39"N`, lng:`100°31'31.09"E`, place:"ตรงข้ามเดอะทรี อินเตอร์เชนจ์ คอนโด"},
+  {id:46, group:"shelter", lat:`13°49'38.18"N`, lng:`100°32'17.87"E`, place:"ซอยคลังมนตรี"},
+  {id:47, group:"shelter", lat:`13°48'25.58"N`, lng:`100°31'17.86"E`, place:"หลังแยกบางโพ"},
+  {id:48, group:"shelter", lat:`13°48'11.35"N`, lng:`100°31'17.08"E`, place:"สถานีดับเพลิงบางโพ"},
+  {id:49, group:"signOld", lat:`13°49'44.32"N`, lng:`100°32'18.80"E`, place:"แยกประชานุกูล"},
+  {id:50, group:"signOld", lat:`13°48'57.51"N`, lng:`100°32'08.07"E`, place:"ตรงข้ามสะพาน 99"},
+  {id:51, group:"signOld", lat:`13°48'34.92"N`, lng:`100°32'02.76"E`, place:"ตรงข้ามสำนักงานเขตบางซื่อ"},
+  {id:52, group:"signOld", lat:`13°48'28.43"N`, lng:`100°32'01.17"E`, place:"ซอยประชาชื่น 1"},
+  {id:53, group:"signOld", lat:`13°48'28.57"N`, lng:`100°31'51.95"E`, place:"ก่อนแยกเตาปูน"},
+  {id:54, group:"signOld", lat:`13°48'47.62"N`, lng:`100°31'54.24"E`, place:"ซอยกรุงเทพ-นนทบุรี 20"},
+  {id:55, group:"signOld", lat:`13°49'17.36"N`, lng:`100°31'57.83"E`, place:"ตรงข้ามตลาดบางซ่อน"},
+  {id:56, group:"signOld", lat:`13°49'33.07"N`, lng:`100°31'53.55"E`, place:"ซอยกรุงเทพ-นนทบุรี 44"},
+  {id:57, group:"signOld", lat:`13°49'47.57"N`, lng:`100°31'35.08"E`, place:"MRT วงศ์สว่าง (ทางออก 1)"},
+  {id:58, group:"signOld", lat:`13°49'35.57"N`, lng:`100°31'49.40"E`, place:"ซอยกรุงเทพ-นนทบุรี 39"},
+  {id:59, group:"signOld", lat:`13°49'22.79"N`, lng:`100°31'57.45"E`},
+  {id:60, group:"signOld", lat:`13°48'37.81"N`, lng:`100°31'53.11"E`, place:"ซอยกรุงเทพ-นนทบุรี 12"},
+  {id:61, group:"signOld", lat:`13°49'14.64"N`, lng:`100°31'13.06"E`},
+  {id:62, group:"signOld", lat:`13°49'23.84"N`, lng:`100°31'23.08"E`},
+  {id:63, group:"signOld", lat:`13°49'36.18"N`, lng:`100°31'35.31"E`, place:"ตรงข้ามบิ๊กซีวงศ์สว่าง"},
+  {id:64, group:"signOld", lat:`13°49'29.13"N`, lng:`100°31'27.65"E`, place:"ซอยวงศ์สว่าง 23"},
+  {id:65, group:"signOld", lat:`13°49'18.57"N`, lng:`100°31'15.93"E`, place:"วัดน้อย"},
+  {id:66, group:"signOld", lat:`13°49'13.05"N`, lng:`100°31'10.10"E`, place:"นาดาวเพลส"},
+  {id:67, group:"signOld", lat:`13°48'41.40"N`, lng:`100°31'18.90"E`, place:"โรงเรียนกุลวรรณศึกษา"},
+  {id:68, group:"signOld", lat:`13°48'53.10"N`, lng:`100°31'14.37"E`},
+  {id:69, group:"signOld", lat:`13°48'50.53"N`, lng:`100°31'06.76"E`, place:"ตรงข้ามวัดสร้อยทอง"},
+  {id:70, group:"signOld", lat:`13°48'50.29"N`, lng:`100°31'05.38"E`},
+  {id:71, group:"signOld", lat:`13°49'13.89"N`, lng:`100°30'32.01"E`},
+  {id:72, group:"signOld", lat:`13°48'56.01"N`, lng:`100°30'54.36"E`, place:"ตรงข้ามสวนสะพานพระราม 7"},
+  {id:73, group:"signOld", lat:`13°48'38.08"N`, lng:`100°31'18.11"E`},
+  {id:74, group:"signOld", lat:`13°48'25.96"N`, lng:`100°31'17.57"E`},
+  {id:75, group:"signOld", lat:`13°48'06.00"N`, lng:`100°31'16.50"E`, place:"ตรงข้ามวัดประดู่ธรรมาธิปัตย์"},
+  {id:76, group:"signOld", lat:`13°48'23.31"N`, lng:`100°31'41.65"E`, place:"ซอยเยาวพา"},
+  {id:77, group:"shelterOk", lat:`13°50'05.84"N`, lng:`100°32'23.99"E`, place:"ตรงข้ามหมู่บ้านซีเมนต์ไทย"},
+  {id:78, group:"shelterOk", lat:`13°49'56.95"N`, lng:`100°31'24.02"E`, place:"วัดเลียบราษฎร์บำรุง"},
+  {id:79, group:"shelterOk", lat:`13°49'50.97"N`, lng:`100°31'56.27"E`},
+  {id:80, group:"shelterOk", lat:`13°49'07.05"N`, lng:`100°30'49.24"E`},
+  {id:81, group:"shelterOk", lat:`13°48'49.88"N`, lng:`100°31'06.46"E`, place:"วัดสร้อยทอง"},
+  {id:82, group:"shelterOk", lat:`13°48'49.56"N`, lng:`100°31'15.91"E`, place:"โรงเรียนโยธินบูรณะ"},
+  {id:83, group:"shelterOk", lat:`13°49'18.83"N`, lng:`100°31'17.57"E`},
+  {id:84, group:"shelterOk", lat:`13°49'37.38"N`, lng:`100°31'38.31"E`, place:"บิ๊กซีวงศ์สว่าง"},
+  {id:85, group:"shelterOk", lat:`13°49'49.65"N`, lng:`100°31'55.13"E`, place:"กรมยุทธบริการทหาร"},
+  {id:86, group:"shelterOk", lat:`13°49'50.37"N`, lng:`100°32'03.21"E`, place:"เบนซ์วงศ์สว่าง"},
+  {id:87, group:"shelterOk", lat:`13°49'50.56"N`, lng:`100°32'14.24"E`},
+  {id:88, group:"shelterOk", lat:`13°49'07.85"N`, lng:`100°30'49.68"E`, place:"มจพ."},
+  {id:89, group:"shelterOk", lat:`13°49'14.48"N`, lng:`100°30'30.82"E`, place:"หมู่บ้านบ้านพิบูลย์"},
+  {id:90, group:"shelterOk", lat:`13°48'12.84"N`, lng:`100°31'16.71"E`, place:"ตรงข้ามสถานีดับเพลิงบางโพ"},
+  {id:91, group:"signNew", lat:`13°48'37.91"N`, lng:`100°31'52.46"E`},
+  {id:92, group:"signNew", lat:`13°49'02.43"N`, lng:`100°31'55.50"E`, place:"วัดเชิงหวาย"},
+  {id:93, group:"signNew", lat:`13°49'24.12"N`, lng:`100°31'22.47"E`, place:"ซอยวัดหลวง"},
+  {id:94, group:"signNew", lat:`13°49'08.10"N`, lng:`100°31'04.70"E`, place:"ตรงข้ามวัดเสาหิน"},
+  {id:95, group:"signNew", lat:`13°49'10.23"N`, lng:`100°30'41.75"E`, place:"มาสด้า พระราม 7"},
+  {id:96, group:"signNew", lat:`13°49'10.06"N`, lng:`100°30'39.17"E`},
+  {id:97, group:"signNew", lat:`13°48'23.25"N`, lng:`100°31'22.43"E`, place:"รพ.บางโพ"},
+  {id:98, group:"signNew", lat:`13°48'21.03"N`, lng:`100°31'56.79"E`, place:"ตรงข้ามตลาดเตาปูน"},
+  {id:99, group:"shelterNew", lat:`13°49'20.71"N`, lng:`100°32'13.45"E`, place:"เมโทรสกาย บางซ่อน"},
+  {id:100, group:"shelterNew", lat:`13°48'49.91"N`, lng:`100°32'06.13"E`, place:"ซอยประชาชื่น 12"},
+  {id:101, group:"shelterNew", lat:`13°48'22.82"N`, lng:`100°31'26.12"E`},
+  {id:102, group:"shelterNew", lat:`13°48'22.75"N`, lng:`100°31'44.26"E`, place:"ซอยสะพานขวา"},
 ];
 // hidden:true = ซ่อนไว้ตอนเปิดหน้า (ตรงกับที่ซ่อนไว้ใน Google Earth) ผู้ชมกดเปิดได้
 // ชื่อถนน [ถนน, จุดอ้างอิงใกล้เคียง, แขวง] จากพิกัด (OpenStreetMap / Nominatim, 17 ต.ค. 2569)
@@ -1027,6 +1101,69 @@ const DATA = {
   37:["เก่า", "เก้าอี้ชำรุด", 4, null, "เก่า", null, null, null, null],
   38:["เก่า", "เก้าอี้ชำรุด", 4, null, "เก่า", null, null, null, null],
   39:["เก่า", "ไฟส่องสว่างชำรุด", null, "ไม่มี", "เก่า", null, null, null, null],
+  40:[null, null, null, null, "เก่า", "ชำรุด", null, null, null],
+  41:[null, null, null, null, "เก่า", "ชำรุด", null, null, null],
+  42:[null, null, null, null, "เก่า", "ชำรุด", null, null, null],
+  43:["เก่า", "ชำรุด", null, null, "เก่า", null, null, null, null],
+  44:["เก่า", "ชำรุด", null, null, null, null, null, null, null],
+  45:["เก่า", "ชำรุด", null, null, "เก่า", null, null, null, null],
+  46:["เก่า", "ชำรุด", null, null, null, null, null, null, null],
+  47:["เก่า", "ชำรุด", null, null, null, null, null, null, null],
+  48:["เก่า", "ชำรุด", null, null, null, null, null, null, null],
+  49:[null, null, null, null, "เก่า", null, null, null, null],
+  50:[null, null, null, null, "เก่า", null, null, null, null],
+  51:[null, null, null, null, "เก่า", null, null, null, null],
+  52:[null, null, null, null, "เก่า", null, null, null, null],
+  53:[null, null, null, null, "เก่า", null, null, null, null],
+  54:[null, null, null, null, "เก่า", null, null, null, null],
+  55:[null, null, null, null, "เก่า", null, null, null, null],
+  56:[null, null, null, null, "เก่า", null, null, null, null],
+  57:[null, null, null, null, "เก่า", null, null, null, null],
+  58:[null, null, null, null, "เก่า", null, null, null, null],
+  59:[null, null, null, null, "เก่า", null, null, null, null],
+  60:[null, null, null, null, "เก่า", null, null, null, null],
+  61:[null, null, null, null, "เก่า", null, null, null, null],
+  62:[null, null, null, null, "เก่า", null, null, null, null],
+  63:[null, null, null, null, "เก่า", null, null, null, null],
+  64:[null, null, null, null, "เก่า", null, null, null, null],
+  65:[null, null, null, null, "เก่า", null, null, null, null],
+  66:[null, null, null, null, "เก่า", null, null, null, null],
+  67:[null, null, null, null, "เก่า", null, null, null, null],
+  68:[null, null, null, null, "เก่า", null, null, null, null],
+  69:[null, null, null, null, "เก่า", null, null, null, null],
+  70:[null, null, null, null, "เก่า", null, null, null, null],
+  71:[null, null, null, null, "เก่า", null, null, null, null],
+  72:[null, null, null, null, "เก่า", null, null, null, null],
+  73:[null, null, null, null, "เก่า", null, null, null, null],
+  74:[null, null, null, null, "เก่า", null, null, null, null],
+  75:[null, null, null, null, "เก่า", null, null, null, null],
+  76:[null, null, null, null, "เก่า", null, null, null, null],
+  77:["เก่า", "ปกติ", null, null, "เก่า", null, null, null, null],
+  78:["เก่า", "ปกติ", null, null, "เก่า", null, null, null, null],
+  79:["เก่า", "ปกติ", null, null, "เก่า", null, null, null, null],
+  80:["เก่า", "ปกติ", null, null, "เก่า", null, null, null, null],
+  81:["เก่า", "ปกติ", null, null, "เก่า", null, null, null, null],
+  82:["เก่า", "ปกติ", null, null, "เก่า", null, null, null, null],
+  83:["เก่า", "ปกติ", null, null, null, null, null, null, null],
+  84:["เก่า", "ปกติ", null, null, null, null, null, null, null],
+  85:["เก่า", "ปกติ", null, null, null, null, null, null, null],
+  86:["เก่า", "ปกติ", null, null, null, null, null, null, null],
+  87:["เก่า", "ปกติ", null, null, null, null, null, null, null],
+  88:["เก่า", "ปกติ", null, null, null, null, null, null, null],
+  89:["เก่า", "ปกติ", null, null, null, null, null, null, null],
+  90:["เก่า", "ปกติ", null, null, null, null, null, null, null],
+  91:[null, null, null, null, "ใหม่", null, null, null, null],
+  92:[null, null, null, null, "ใหม่", null, null, null, null],
+  93:[null, null, null, null, "ใหม่", null, null, null, null],
+  94:[null, null, null, null, "ใหม่", null, null, null, null],
+  95:[null, null, null, null, "ใหม่", null, null, null, null],
+  96:[null, null, null, null, "ใหม่", null, null, null, null],
+  97:[null, null, null, null, "ใหม่", null, null, null, null],
+  98:[null, null, null, null, "ใหม่", null, null, null, null],
+  99:["ใหม่", null, null, null, "เก่า", null, null, null, null],
+  100:["ใหม่", null, null, null, "เก่า", null, null, null, null],
+  101:["ใหม่", null, null, null, null, null, null, null, null],
+  102:["ใหม่", null, null, null, null, null, null, null, null],
 };
 const PHOTOS = {
   1:["1-Jokxm5IF_heP5d-gPNSHDRQ_X5cyFtG"],
@@ -1167,7 +1304,7 @@ function renderStats(){
   const broken = POINTS.filter(lampBroken);
   const chairs = POINTS.filter(chairBroken);
   document.getElementById("stats").innerHTML = `
-    <div class="stat"><b>${POINTS.length}</b><span>จุดที่ควรปรับปรุง</span></div>
+    <div class="stat"><b>${POINTS.filter(p => NEEDS_FIX.has(p.group)).length}</b><span>จุดที่ควรปรับปรุง</span></div>
     <div class="stat"><b>${broken.length}</b><span>ศาลาไฟชำรุด</span></div>
     <div class="stat"><b>${chairs.length}</b><span>ศาลาเก้าอี้ชำรุด</span></div>`;
 }
@@ -1179,7 +1316,7 @@ const FILTERS = [
   {k:"digital", label:"ป้ายดิจิทัล", color:"var(--stop)"},
 ];
 const FILTER_TEST = {
-  sign: p => p.group === "sign", shelter: p => p.group === "shelter", move: p => p.group === "move",
+  ...Object.fromEntries(Object.keys(GROUPS).map(k => [k, p => p.group === k])),
   lamp: p => lampBroken(p), chair: p => chairBroken(p), digital: p => isDigital(p),
 };
 const matchFilter = p => !filters.size || (fmode === "all" ? [...filters].every(k => FILTER_TEST[k](p)) : [...filters].some(k => FILTER_TEST[k](p)));

@@ -705,7 +705,8 @@ html,body{height:100%;margin:0;overscroll-behavior:none}
 body{font-family:var(--f-body);color:var(--ink);background:var(--paper);font-size:15px;line-height:1.55}
 .app{display:grid;grid-template-columns:minmax(300px,380px) 1fr;height:100%;height:100dvh}
 .handle,.touch-only{display:none}
-aside{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--line);overflow:hidden}
+aside{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--line);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+aside > *{flex:none}
 .head{padding:18px 18px 12px;border-bottom:1px solid var(--line)}
 .eyebrow{display:inline-flex;align-items:center;gap:8px;font:600 12px/1 var(--f-display);letter-spacing:.06em;color:var(--party)}
 .eyebrow i{width:18px;height:18px;border-radius:4px;background:var(--party);display:inline-grid;place-items:center;color:#fff;font-style:normal;font-size:11px}
@@ -720,7 +721,7 @@ h1{font:700 21px/1.3 var(--f-display);margin:8px 0 4px;text-wrap:balance}
 .chip[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--paper)}
 .chip .dot{width:9px;height:9px;border-radius:50%}
 .chip:focus-visible,.item:focus-visible,.eye:focus-visible,button:focus-visible{outline:2px solid var(--stop);outline-offset:2px}
-.list{overflow-y:auto;flex:1;padding:8px 10px 16px}
+.list{padding:8px 10px 16px}
 .item{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:10px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;background:none;width:100%;text-align:left;color:inherit;font:inherit}
 .item:hover,.item.active{background:var(--card);border-color:var(--line)}
 .num{width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:#fff;font:700 14px var(--f-display)}
@@ -835,6 +836,7 @@ img{-webkit-user-drag:none}
     background:var(--paper);border-right:0;border-radius:16px 16px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.28);
     transform:translateY(calc(100% - var(--peek)));transition:transform .28s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
   aside.open{transform:translateY(0)}
+  aside:not(.open){overflow-y:hidden}
   .handle{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;padding:8px 16px 2px;border:0;background:none;color:var(--muted);font:500 12px var(--f-body);cursor:pointer;touch-action:none}
   .grip{width:40px;height:5px;border-radius:3px;background:var(--line)}
   .head{padding:2px 16px 8px;border-bottom:0}
@@ -854,7 +856,9 @@ img{-webkit-user-drag:none}
   .search{margin:10px 16px 0}
   .search input{font-size:16px;padding:10px 8px}
   .vis-all{padding:6px 10px}
-  .list{padding:6px 8px 12px;overscroll-behavior:contain}
+  .list{padding:6px 8px 12px}
+  .roads{flex-wrap:nowrap;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .roads::-webkit-scrollbar{display:none}
   .item{padding:12px 8px}
   .eye{width:44px;height:44px;margin-top:4px}
   .foot{padding:8px 16px}
@@ -888,7 +892,7 @@ img{-webkit-user-drag:none}
     <div class="roads" id="roads" role="group" aria-label="เลือกถนน"></div>
     <div class="visbar"><span id="visCount"></span><span class="vis-btns"><button type="button" id="visOn" class="vis-all"></button><button type="button" id="visOff" class="vis-all"></button></span></div>
     <div class="list" id="list"></div>
-    <div class="foot">จุดที่ 1–39 ข้อมูล ณ 15 ต.ค. 2569 · จุดที่ 40–102 เพิ่มจาก Google Maps 30 ต.ค. 2569 (ยังไม่มีรูปและรายละเอียด) · พิกัดจากการสำรวจภาคสนาม ก.ย. 2569</div>
+    <div class="foot">จุด 1–39 ข้อมูล ณ 15 ต.ค. 2569 · จุด 40–102 จาก Google Maps 30 ต.ค. 2569</div>
   </aside>
   <div class="mapwrap">
     <div id="map" aria-label="แผนที่จุดสำรวจ"></div>
@@ -1582,6 +1586,7 @@ document.addEventListener("contextmenu", e => { if (e.target.tagName === "IMG") 
 /* ================= แผงรายการ (มือถือ) ================= */
 const sheetEl = document.getElementById("sheet"), handle = document.getElementById("handle");
 function setSheet(open){
+  if (!open) sheetEl.scrollTop = 0;
   sheetEl.classList.toggle("open", open);
   handle.setAttribute("aria-expanded", open);
   document.getElementById("handleLabel").textContent = open ? "ย่อรายการ" : `ดูรายการทั้งหมด ${POINTS.length} จุด`;

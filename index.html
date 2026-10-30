@@ -1002,7 +1002,6 @@ const POINTS = [
   {id:42, group:"signOld", lat:`13°49'15.10"N`, lng:`100°31'56.89"E`, place:"ตลาดบางซ่อน"},
   {id:43, group:"shelterOk", lat:`13°49'58.14"N`, lng:`100°32'22.20"E`, place:"รพ.เกษมราษฎร์ ประชาชื่น"},
   {id:44, group:"shelterOk", lat:`13°48'28.64"N`, lng:`100°31'51.37"E`, place:"หลังแยกเตาปูน"},
-  {id:45, group:"shelterOk", lat:`13°48'23.39"N`, lng:`100°31'31.09"E`, place:"ตรงข้ามเดอะทรี อินเตอร์เชนจ์ คอนโด"},
   {id:46, group:"shelterOk", lat:`13°49'38.18"N`, lng:`100°32'17.87"E`, place:"ซอยคลังมนตรี"},
   {id:47, group:"shelterOk", lat:`13°48'25.58"N`, lng:`100°31'17.86"E`, place:"หลังแยกบางโพ"},
   {id:48, group:"shelterOk", lat:`13°48'11.35"N`, lng:`100°31'17.08"E`, place:"สถานีดับเพลิงบางโพ"},
@@ -1026,7 +1025,6 @@ const POINTS = [
   {id:66, group:"signOld", lat:`13°49'13.05"N`, lng:`100°31'10.10"E`, place:"นาดาวเพลส"},
   {id:67, group:"signOld", lat:`13°48'41.40"N`, lng:`100°31'18.90"E`, place:"โรงเรียนกุลวรรณศึกษา"},
   {id:68, group:"signOld", lat:`13°48'53.10"N`, lng:`100°31'14.37"E`},
-  {id:69, group:"signOld", lat:`13°48'50.53"N`, lng:`100°31'06.76"E`, place:"ตรงข้ามวัดสร้อยทอง"},
   {id:70, group:"signOld", lat:`13°48'50.29"N`, lng:`100°31'05.38"E`},
   {id:71, group:"signOld", lat:`13°49'13.89"N`, lng:`100°30'32.01"E`},
   {id:72, group:"signOld", lat:`13°48'56.01"N`, lng:`100°30'54.36"E`, place:"ตรงข้ามสวนสะพานพระราม 7"},
@@ -1149,7 +1147,6 @@ const DATA = {
   42:[null, null, null, null, "เก่า", null, null, null, null],
   43:["เก่า", null, null, null, "เก่า", null, null, null, null],
   44:["เก่า", null, null, null, null, null, null, null, null],
-  45:["เก่า", null, null, null, "เก่า", null, null, null, null],
   46:["เก่า", null, null, null, null, null, null, null, null],
   47:["เก่า", null, null, null, null, null, null, null, null],
   48:["เก่า", null, null, null, null, null, null, null, null],
@@ -1173,7 +1170,6 @@ const DATA = {
   66:[null, null, null, null, "เก่า", null, null, null, null],
   67:[null, null, null, null, "เก่า", null, null, null, null],
   68:[null, null, null, null, "เก่า", null, null, null, null],
-  69:[null, null, null, null, "เก่า", null, null, null, null],
   70:[null, null, null, null, "เก่า", null, null, null, null],
   71:[null, null, null, null, "เก่า", null, null, null, null],
   72:[null, null, null, null, "เก่า", null, null, null, null],
@@ -1259,6 +1255,8 @@ const ROAD_LINES = [
 ];
 const ROAD_NEAR_M = 50; /* จุดที่ห่างเส้นถนนไม่เกินระยะนี้ นับว่าอยู่บนถนนนั้น (ใช้กับปุ่มเลือกถนนเท่านั้น) */
 /* ลิงก์ Web app ของ Google Apps Script ที่ผูกกับชีต (ใส่หลังติดตั้งสคริปต์) ว่างไว้ = ปิดปุ่มเพิ่มรูป */
+/* จุดที่ลบแล้ว (30 ต.ค. 2569) ไม่แสดงแม้มีข้อมูลค้างในชีต */
+const DELETED_IDS = new Set([45, 69]);
 const PHOTO_API = "https://script.google.com/macros/s/AKfycbwHa2qy-gz8Wum2LIW8-lpstDhs2L64GImdD6mJKjUdAU7jEBx5Iq_yqtXyj8X4iYevkA/exec";
 const FIELDS = ["shelterForm","shelterStatus","chairsBroken","tempLamp","signForm","signStatus","bench","benchN","detail"];
 
@@ -1654,6 +1652,7 @@ function loadSheetPhotos(){
     const F = j.fields || {};
     POINTS.forEach(p => { const f = F[p.id]; if (f && f.some(v => v != null && v !== "")) { applyFields(p, f); changed = true; } });
     (j.points || []).forEach(n => {
+      if (DELETED_IDS.has(+n.id)) return;
       const p = POINTS.find(x => x.id === n.id);
       if (p) { applyEdit(p, n); changed = true; } else { addPoint(n, j.photos[n.id] || []); changed = true; }
     });

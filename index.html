@@ -739,6 +739,21 @@ h1{font:700 21px/1.3 var(--f-display);margin:8px 0 4px;text-wrap:balance}
 .pin svg{width:20px;height:20px;display:block}
 .pin .lamp{position:absolute;top:-6px;right:-6px;width:12px;height:12px;border-radius:50%;border:2px solid #fff}
 .pin.dim{opacity:.18}
+.pin.draft{outline:3px dashed var(--party);outline-offset:3px}
+#map.picking, #map.picking .leaflet-interactive{cursor:crosshair}
+.addpin{font:600 14px var(--f-body);background:var(--party);color:#fff;border:2px solid #fff;border-radius:999px;padding:8px 14px;box-shadow:0 2px 10px rgba(0,0,0,.3);cursor:pointer}
+.pickbar{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:1001;display:flex;align-items:center;gap:10px;background:var(--card);color:var(--ink);border-radius:999px;padding:6px 6px 6px 16px;box-shadow:0 6px 20px rgba(0,0,0,.3);font:500 14px var(--f-body);max-width:calc(100% - 24px)}
+.addform{gap:12px}
+.addform label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}
+.addform input:not([type=checkbox]),.addform select,.addform textarea{font:400 15px var(--f-body);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.addform input[type=file]{padding:6px}
+.addform fieldset{border:1px solid var(--line);border-radius:10px;padding:8px 12px 12px;margin:0;display:flex;flex-direction:column;gap:10px}
+.addform legend{font:600 13.5px var(--f-body);color:var(--ink);padding:0 4px}
+.addform .checks{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}
+.addform label.chk{flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:14.5px}
+.addform .chk input{width:18px;height:18px}
+.addform .req{color:var(--alert-ink)}
+.linkbtn{font:500 13px var(--f-body);background:none;border:0;color:var(--stop);padding:0;cursor:pointer;text-decoration:underline}
 .leaflet-marker-icon.is-out{pointer-events:none;cursor:default}
 .visbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 8px;padding:8px 18px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
 .vis-btns{display:flex;gap:6px}
@@ -867,6 +882,7 @@ img{-webkit-user-drag:none}
   .x{width:40px;height:40px;font-size:20px}
   .btn{padding:10px 14px;font-size:14px}
   .leaflet-touch .leaflet-bar a{width:36px;height:36px;line-height:36px}
+  .pickbar{top:auto;bottom:calc(var(--peek) + 12px)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -1244,17 +1260,18 @@ function segDist(p, a, b){
   const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / (dx*dx + dy*dy)));
   return Math.hypot(px - ax - t*dx, py - ay - t*dy);
 }
-POINTS.forEach(p => {
+function nearestLine(lat, lng){
   let best = null, bd = Infinity;
-  ROAD_LINES.forEach(r => { for (let i = 0; i < r.coords.length - 1; i++) { const d = segDist([p.latD, p.lngD], r.coords[i], r.coords[i+1]); if (d < bd) { bd = d; best = r.name; } } });
-  p.line = bd <= ROAD_NEAR_M ? best : null;
-});
+  ROAD_LINES.forEach(r => { for (let i = 0; i < r.coords.length - 1; i++) { const d = segDist([lat, lng], r.coords[i], r.coords[i+1]); if (d < bd) { bd = d; best = r.name; } } });
+  return bd <= ROAD_NEAR_M ? best : null;
+}
+POINTS.forEach(p => { p.line = nearestLine(p.latD, p.lngD); });
 const hasShelter = p => !!p.shelterForm && !/ไม่มี/.test(p.shelterForm);
 const lampBroken = p => hasShelter(p) && /ไฟ/.test(p.shelterStatus || "");
 const chairBroken = p => /เก้าอี้/.test(p.shelterStatus || "");
 const isDigital = p => /ดิจิ/.test(p.signForm || "");
 const tempYes = p => /^มี/.test(p.tempLamp || "");
-const signForm = p => !p.signForm ? null : isDigital(p) ? "ป้ายดิจิทัล" : /ใหม่/.test(p.signForm) ? "ป้ายแบบใหม่" : "ป้ายเก่า";
+const signForm = p => !p.signForm || /ไม่มี/.test(p.signForm) ? null : isDigital(p) ? "ป้ายดิจิทัล" : /ใหม่/.test(p.signForm) ? "ป้ายแบบใหม่" : "ป้ายเก่า";
 const signText = p => { const f = signForm(p); if (!f) return null; const s = p.signStatus && p.signStatus !== "ปกติ" ? ` · ${p.signStatus}` : ""; return f + s; };
 const shelterText = p => !p.shelterForm ? "ศาลา: ไม่ได้บันทึก" : !hasShelter(p) ? "ไม่มีศาลา" : /ใหม่/.test(p.shelterForm) ? "ศาลาแบบใหม่" : "ศาลาแบบเก่า";
 const tempText = p => tempYes(p) ? (p.tempCount ? `ติดไฟชั่วคราวแล้ว ${p.tempCount} ดวง` : "ติดไฟชั่วคราวแล้ว")
@@ -1302,6 +1319,7 @@ const BUS_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d
 const iconFor = p => L.divIcon({className:"", iconSize:[32,40], iconAnchor:[16,40], tooltipAnchor:[0,-38],
   html:`<div class="pin" style="--pc:${GROUPS[p.group].color}">${BUS_SVG}</div>`});
 let selRoad = null;
+let picking = false;
 const roadLayers = {};
 ROAD_LINES.forEach(r => {
   const ln = L.polyline(r.coords, {color:r.color, weight:5, opacity:.8, lineCap:"round"}).addTo(map);
@@ -1333,14 +1351,15 @@ function renderRoads(){
 const shown = {};
 POINTS.forEach(p => shown[p.id] = !p.hidden);
 const markers = {};
-POINTS.forEach(p => {
+function addMarker(p){
   const m = L.marker([p.latD, p.lngD], {icon:iconFor(p), title:`จุดที่ ${p.id}`, keyboard:true});
   if (shown[p.id]) m.addTo(map);
   if (!isTouch) m.bindTooltip(() => hoverHtml(p), {className:"hover", direction:"top", opacity:1});
   m.on("tooltipopen", () => { if (!match(p)) m.closeTooltip(); });
-  m.on("click", () => { if (!match(p)) return; openDetail(p); focusPoint(p); });
+  m.on("click", () => { if (picking || !match(p)) return; openDetail(p); focusPoint(p); });
   markers[p.id] = m;
-});
+}
+POINTS.forEach(addMarker);
 function fitAll(){
   const peek = mqMobile.matches ? parseInt(getComputedStyle(document.documentElement).getPropertyValue("--peek")) || 150 : 0;
   map.fitBounds(L.latLngBounds(POINTS.map(p => [p.latD, p.lngD])), {paddingTopLeft:[20, 20], paddingBottomRight:[20, 20 + peek]});
@@ -1466,6 +1485,7 @@ function renderAll(){ POINTS.forEach(p => markers[p.id].setIcon(iconFor(p))); re
 const drawer = document.getElementById("drawer");
 let openId = null;
 function openDetail(p){
+  if (draft) cancelDraft();
   openId = p.id;
   document.querySelectorAll(".item").forEach(el => el.classList.toggle("active", el.dataset.id == p.id));
   const gal = p.photos.length
@@ -1544,14 +1564,160 @@ function loadSheetPhotos(){
   fetch(PHOTO_API, {cache:"no-store"}).then(r => r.json()).then(j => {
     if (!j || !j.ok || !j.photos) return;
     let changed = false;
+    (j.points || []).forEach(n => { if (!POINTS.some(p => p.id === n.id)) { addPoint(n, j.photos[n.id] || []); changed = true; } });
     POINTS.forEach(p => {
       const next = (j.photos[p.id] || []).slice();
       if (next.join() !== p.photos.join()) { p.photos = next; changed = true; }
     });
-    if (changed) { renderList(); const o = POINTS.find(p => p.id === openId); if (o) openDetail(o); }
+    if (changed) { renderStats(); renderRoads(); renderList(); const o = POINTS.find(p => p.id === openId); if (o) openDetail(o); }
   }).catch(() => {});
 }
-function closeDetail(){ openId = null; drawer.hidden = true; document.querySelectorAll(".item.active").forEach(e => e.classList.remove("active")); }
+
+/* ================= เพิ่มหมุดใหม่ ================= */
+const GROUP_BY_LABEL = Object.fromEntries(Object.entries(GROUPS).map(([k, g]) => [g.label, k]));
+/* n = {id, lat, lng, group(ชื่อกลุ่ม), place, road, f:[ค่าตาม FIELDS]} */
+function addPoint(n, photos){
+  const p = {id:n.id, group: GROUP_BY_LABEL[n.group] || GROUPS[n.group] && n.group || "signOld", lat:"", lng:"",
+             latD:+n.lat, lngD:+n.lng, place:n.place || "", road:n.road || "", near:"", sub:"", photos: photos || [], added:true};
+  applyFields(p, n.f || []);
+  p.line = nearestLine(p.latD, p.lngD);
+  POINTS.push(p); shown[p.id] = true; addMarker(p);
+  return p;
+}
+const OPTS = {
+  signForm:["ไม่มี","เก่า","ใหม่","ดิจิตอล"], signStatus:["ปกติ","เลือนลาง","โดนบดบัง","ชำรุด"],
+  shelterForm:["ไม่มี","เก่า","ใหม่"], shelterStatus:["ปกติ","ไฟส่องสว่างชำรุด","เก้าอี้ชำรุด","โครงสร้างชำรุด"],
+  yesno:["มี","ไม่มี"],
+};
+let draft = null; /* {latlng, marker, form} */
+const pickBar = document.createElement("div");
+pickBar.className = "pickbar"; pickBar.hidden = true;
+pickBar.innerHTML = `<span>แตะบนแผนที่ตรงตำแหน่งป้ายหรือศาลา</span><button type="button" class="btn">ยกเลิก</button>`;
+document.querySelector(".mapwrap").appendChild(pickBar);
+pickBar.querySelector("button").onclick = () => { if (draft && draft.form) { setPicking(false); drawer.hidden = false; } else cancelDraft(); };
+function setPicking(on){
+  picking = on; pickBar.hidden = !on;
+  document.getElementById("map").classList.toggle("picking", on);
+  if (on) { if (mqMobile.matches) setSheet(false); drawer.hidden = true; }
+}
+function startAdd(){
+  if (draft) cancelDraft();
+  closeDetail();
+  draft = {};
+  setPicking(true);
+}
+const draftIcon = () => L.divIcon({className:"", iconSize:[32,40], iconAnchor:[16,40],
+  html:`<div class="pin draft" style="--pc:${draft && draft.form ? GROUPS[draft.form.querySelector("[name=group]").value]?.color || "var(--party)" : "var(--party)"}">${BUS_SVG}</div>`});
+function placeDraft(latlng){
+  if (!draft) return;
+  draft.latlng = latlng;
+  if (!draft.marker) {
+    draft.marker = L.marker(latlng, {icon:draftIcon(), draggable:true, zIndexOffset:1000}).addTo(map);
+    draft.marker.on("dragend", () => { draft.latlng = draft.marker.getLatLng(); updateDraftCoords(); });
+  } else draft.marker.setLatLng(latlng);
+  setPicking(false);
+  if (!draft.form) openAddForm(); else { drawer.hidden = false; updateDraftCoords(); }
+  focusPoint({latD:latlng.lat, lngD:latlng.lng});
+}
+function updateDraftCoords(){
+  if (!draft || !draft.form) return;
+  const {lat, lng} = draft.latlng;
+  draft.form.querySelector(".draft-coord").textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  const road = draft.form.querySelector("[name=road]");
+  if (!road.dataset.touched) road.value = nearestLine(lat, lng) || "";
+}
+function cancelDraft(){
+  if (!draft) return;
+  if (draft.marker) map.removeLayer(draft.marker);
+  draft = null; setPicking(false);
+  if (openId == null) drawer.hidden = true;
+}
+function openAddForm(){
+  openId = null;
+  const sel = (name, opts, blank = "ไม่ได้ระบุ") => `<select name="${name}"><option value="">${blank}</option>${opts.map(o => `<option>${o}</option>`).join("")}</select>`;
+  drawer.innerHTML = `
+    <header><h2>เพิ่มหมุดใหม่</h2><button type="button" class="x" aria-label="ยกเลิก">×</button></header>
+    <form class="scroll addform" novalidate>
+      <label>กลุ่ม <b class="req">*</b><select name="group" required><option value="">เลือกกลุ่ม</option>${Object.entries(GROUPS).map(([k,g]) => `<option value="${k}">${g.label}</option>`).join("")}</select></label>
+      <label>ชื่อที่ตั้ง<input name="place" maxlength="200" placeholder="เช่น หน้าวัดน้อย"></label>
+      <label>ถนน<input name="road" maxlength="200" list="roadList"><datalist id="roadList">${ROAD_LINES.map(r => `<option>${r.name}</option>`).join("")}</datalist></label>
+      <fieldset><legend>ป้าย</legend>
+        <label>รูปแบบป้าย${sel("signForm", OPTS.signForm)}</label>
+        <label>สถานะป้าย${sel("signStatus", OPTS.signStatus)}</label>
+      </fieldset>
+      <fieldset><legend>ศาลา</legend>
+        <label>รูปแบบศาลา${sel("shelterForm", OPTS.shelterForm)}</label>
+        <div class="checks"><span>สถานะศาลา</span>${OPTS.shelterStatus.map(o => `<label class="chk"><input type="checkbox" name="shelterStatus" value="${o}">${o}</label>`).join("")}</div>
+        <label data-if="chair" hidden>เก้าอี้ชำรุด (ตัว)<input name="chairsBroken" type="number" min="1" max="99" inputmode="numeric"></label>
+        <label data-if="lamp" hidden>ติดตั้งไฟชั่วคราวแล้วหรือไม่${sel("tempLamp", OPTS.yesno)}</label>
+      </fieldset>
+      <fieldset><legend>ม้านั่ง</legend>
+        <label>มีม้านั่งหรือไม่${sel("bench", OPTS.yesno)}</label>
+        <label data-if="bench" hidden>จำนวนม้านั่ง (ตัว)<input name="benchN" type="number" min="1" max="99" inputmode="numeric"></label>
+      </fieldset>
+      <label>รายละเอียดเพิ่มเติม<textarea name="detail" rows="3" maxlength="500"></textarea></label>
+      <label>รูป (เลือกได้หลายรูป)<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+      <div class="coord">ตำแหน่ง: <span class="draft-coord"></span><br><button type="button" class="linkbtn move">ย้ายตำแหน่ง</button>${isTouch ? "" : " หรือลากหมุดสีส้มบนแผนที่"}</div>
+      <div class="btns"><button type="submit" class="btn primary">บันทึกหมุด</button><button type="button" class="btn cancel">ยกเลิก</button></div>
+      <div class="up-status" aria-live="polite" hidden></div>
+    </form>`;
+  drawer.hidden = false;
+  const f = drawer.querySelector("form");
+  draft.form = f;
+  const sync = () => {
+    const st = [...f.querySelectorAll("[name=shelterStatus]:checked")].map(i => i.value);
+    f.querySelector("[data-if=chair]").hidden = !st.includes("เก้าอี้ชำรุด");
+    f.querySelector("[data-if=lamp]").hidden = !st.includes("ไฟส่องสว่างชำรุด");
+    f.querySelector("[data-if=bench]").hidden = f.bench.value !== "มี";
+    if (draft && draft.marker) draft.marker.setIcon(draftIcon());
+  };
+  f.addEventListener("change", sync);
+  f.road.addEventListener("input", () => { f.road.dataset.touched = "1"; });
+  drawer.querySelector(".x").onclick = cancelDraft;
+  f.querySelector(".cancel").onclick = cancelDraft;
+  f.querySelector(".move").onclick = () => setPicking(true);
+  f.onsubmit = e => { e.preventDefault(); submitDraft(f); };
+  updateDraftCoords();
+  if (mqMobile.matches) setSheet(false);
+}
+async function submitDraft(f){
+  const st = f.querySelector(".up-status");
+  const say = (t, err) => { st.hidden = false; st.textContent = t; st.classList.toggle("err", !!err); };
+  if (!f.group.value) { say("กรุณาเลือกกลุ่ม", true); f.group.focus(); return; }
+  const statuses = [...f.querySelectorAll("[name=shelterStatus]:checked")].map(i => i.value);
+  const vals = {
+    shelterForm:f.shelterForm.value, shelterStatus:statuses, chairsBroken:f.chairsBroken.value, tempLamp:f.tempLamp.value,
+    signForm:f.signForm.value, signStatus:f.signStatus.value, bench:f.bench.value, benchN:f.benchN.value, detail:f.detail.value.trim(),
+  };
+  const btn = f.querySelector("[type=submit]"); btn.disabled = true;
+  say("กำลังบันทึกหมุด…");
+  try {
+    const {lat, lng} = draft.latlng;
+    const body = {action:"addPoint", lat, lng, group:GROUPS[f.group.value].label, place:f.place.value.trim(), road:f.road.value.trim(), f:vals};
+    const r = await fetch(PHOTO_API, {method:"POST", body: JSON.stringify(body)}).then(r => r.json());
+    if (!r.ok) throw new Error(r.error || "บันทึกไม่สำเร็จ");
+    const num = v => { const n = parseInt(v, 10); return n > 0 ? n : null; };
+    const files = [...f.photos.files];
+    const p = addPoint({id:r.id, lat, lng, group:body.group, place:body.place, road:body.road, f:[
+      vals.shelterForm, statuses.join(", "), statuses.includes("เก้าอี้ชำรุด") ? num(vals.chairsBroken) : null,
+      statuses.includes("ไฟส่องสว่างชำรุด") ? vals.tempLamp : null, vals.signForm, vals.signStatus, vals.bench,
+      vals.bench === "มี" ? num(vals.benchN) : null, vals.detail]}, []);
+    map.removeLayer(draft.marker); draft = null;
+    renderStats(); renderRoads(); renderList();
+    openDetail(p); focusPoint(p);
+    if (files.length) uploadPhotos(p, files);
+  } catch (e) {
+    btn.disabled = false;
+    say(e.message || "บันทึกไม่สำเร็จ", true);
+  }
+}
+if (PHOTO_API) {
+  const add = L.control({position:"topright"});
+  add.onAdd = () => { const b = L.DomUtil.create("button", "addpin"); b.type = "button"; b.innerHTML = "+ เพิ่มหมุด";
+    L.DomEvent.disableClickPropagation(b); b.onclick = startAdd; return b; };
+  add.addTo(map);
+}
+function closeDetail(){ if (draft) cancelDraft(); openId = null; drawer.hidden = true; document.querySelectorAll(".item.active").forEach(e => e.classList.remove("active")); }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDetail(); });
 
 /* ================= ดูรูปขยาย ================= */
@@ -1608,7 +1774,7 @@ handle.addEventListener("touchend", e => {
   if (sy == null) return; const dy = e.changedTouches[0].clientY - sy; sy = null;
   if (Math.abs(dy) > 30) { e.preventDefault(); setSheet(dy < 0); }
 });
-map.on("click", () => { if (mqMobile.matches) { closeDetail(); setSheet(false); } });
+map.on("click", e => { if (picking) { placeDraft(e.latlng); return; } if (mqMobile.matches && !draft) { closeDetail(); setSheet(false); } });
 mqMobile.addEventListener("change", () => { setPeek(); setSheet(false); map.invalidateSize(); });
 window.addEventListener("resize", () => { setPeek(); });
 

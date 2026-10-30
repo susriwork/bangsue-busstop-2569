@@ -742,6 +742,10 @@ h1{font:700 21px/1.3 var(--f-display);margin:8px 0 4px;text-wrap:balance}
 .visbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 8px;padding:8px 18px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
 .vis-btns{display:flex;gap:6px}
 .chip .tick{font-size:11px;line-height:1}
+.roads{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 18px 12px;border-bottom:1px solid var(--line)}
+.roads .lbl{font-size:12.5px;color:var(--muted);margin-right:2px}
+.chip .bar{width:16px;height:4px;border-radius:2px}
+.legend i.ln{width:14px;height:4px;border-radius:2px}
 .filters:has(+ .fmode:not([hidden])){border-bottom:0}
 .fmode{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:0 18px 12px;margin-top:-4px;font-size:12.5px;color:var(--muted);border-bottom:1px solid var(--line)}
 .fmode button{font:500 12.5px var(--f-body);border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:3px 10px;cursor:pointer}
@@ -767,6 +771,7 @@ h1{font:700 21px/1.3 var(--f-display);margin:8px 0 4px;text-wrap:balance}
 .row-item.off .eye{color:var(--muted)}
 
 /* hover card */
+.leaflet-tooltip.road-tip{font:600 12.5px var(--f-body)}
 .leaflet-tooltip.hover{padding:0;border:0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.28);background:var(--card);color:var(--ink);width:260px;white-space:normal;font-family:var(--f-body)}
 .leaflet-tooltip.hover::before{display:none}
 .hc img,.hc .ph{width:100%;height:140px;object-fit:cover;display:block;border-radius:10px 10px 0 0;background:var(--paper)}
@@ -877,6 +882,7 @@ img{-webkit-user-drag:none}
     </div>
     <div class="filters" id="filters" role="group" aria-label="กรองจุด (เลือกได้หลายข้อ)"></div>
     <div class="fmode" id="fmode" role="group" aria-label="วิธีรวมตัวกรอง" hidden><span>แสดงจุดที่ตรงกับ</span><button type="button" data-m="any">ข้อใดข้อหนึ่ง</button><button type="button" data-m="all">ครบทุกข้อ</button></div>
+    <div class="roads" id="roads" role="group" aria-label="เลือกถนน"></div>
     <div class="visbar"><span id="visCount"></span><span class="vis-btns"><button type="button" id="visOn" class="vis-all"></button><button type="button" id="visOff" class="vis-all"></button></span></div>
     <div class="list" id="list"></div>
     <div class="foot">จุดที่ 1–39 ข้อมูล ณ 15 ต.ค. 2569 · จุดที่ 40–102 เพิ่มจาก Google Maps 30 ต.ค. 2569 (ยังไม่มีรูปและรายละเอียด) · พิกัดจากการสำรวจภาคสนาม ก.ย. 2569</div>
@@ -1206,6 +1212,15 @@ const PHOTOS = {
   38:["1wj585GeN3Te2PNRRLaYHGSmCQjXibEQg"],
   39:["1OFlZvKvlRt1P_gHgNpr5wqwX0cwryKfe"],
 };
+/* เส้นถนน 5 เส้น จาก Google Earth (KML 30 ต.ค. 2569) สีตามที่ตั้งไว้ใน Earth */
+const ROAD_LINES = [
+  {name:"ถนนประชาชื่น", color:"#f57c00", coords:[[13.849453,100.543536],[13.805583,100.533238]]},
+  {name:"ถนนกรุงเทพ-นนทบุรี", color:"#7b1fa2", coords:[[13.806446,100.530834],[13.823344,100.532789],[13.824843,100.532379],[13.833639,100.522133]]},
+  {name:"ถนนวงศ์สว่าง", color:"#d32f2f", coords:[[13.817643,100.516733],[13.829184,100.529303],[13.830597,100.531776],[13.830878,100.53438],[13.83044,100.538981]]},
+  {name:"ถนนประชาราษฎร์สาย 1", color:"#303f9f", coords:[[13.803957,100.521445],[13.806499,100.5216],[13.811772,100.521815],[13.814729,100.5209],[13.813759,100.517696],[13.815638,100.515091],[13.817275,100.516353],[13.818366,100.515078]]},
+  {name:"ถนนประชาราษฎร์สาย 2", color:"#00796b", coords:[[13.805712,100.533062],[13.806379,100.530838],[13.806365,100.519792]]},
+];
+const ROAD_NEAR_M = 50; /* จุดที่ห่างเส้นถนนไม่เกินระยะนี้ นับว่าอยู่บนถนนนั้น (ใช้กับปุ่มเลือกถนนเท่านั้น) */
 const FIELDS = ["shelterForm","shelterStatus","chairsBroken","tempLamp","signForm","signStatus","bench","benchN","detail"];
 
 /* ================= helpers ================= */
@@ -1214,6 +1229,17 @@ const dms = s => { const m = s.match(/(\d+)°(\d+)'([\d.]+)"([NSEW])/); let v = 
 function applyFields(p, arr){ FIELDS.forEach((f,i) => p[f] = clean(arr[i])); }
 POINTS.forEach(p => { [p.road, p.near, p.sub] = (ROADS[p.id] || ["","",""]); p.latD = dms(p.lat); p.lngD = dms(p.lng); p.photos = PHOTOS[p.id] || []; applyFields(p, DATA[p.id] || []); });
 
+function segDist(p, a, b){
+  const k = 111320, c = Math.cos(p[0] * Math.PI / 180);
+  const px = p[1]*k*c, py = p[0]*k, ax = a[1]*k*c, ay = a[0]*k, dx = b[1]*k*c - ax, dy = b[0]*k - ay;
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / (dx*dx + dy*dy)));
+  return Math.hypot(px - ax - t*dx, py - ay - t*dy);
+}
+POINTS.forEach(p => {
+  let best = null, bd = Infinity;
+  ROAD_LINES.forEach(r => { for (let i = 0; i < r.coords.length - 1; i++) { const d = segDist([p.latD, p.lngD], r.coords[i], r.coords[i+1]); if (d < bd) { bd = d; best = r.name; } } });
+  p.line = bd <= ROAD_NEAR_M ? best : null;
+});
 const hasShelter = p => !!p.shelterForm && !/ไม่มี/.test(p.shelterForm);
 const lampBroken = p => hasShelter(p) && /ไฟ/.test(p.shelterStatus || "");
 const chairBroken = p => /เก้าอี้/.test(p.shelterStatus || "");
@@ -1246,7 +1272,8 @@ const isTouch = matchMedia("(hover: none)").matches;
 const mqMobile = matchMedia("(max-width:760px)");
 const legend = L.control({position: mqMobile.matches ? "topright" : "bottomleft"});
 legend.onAdd = () => { const d = L.DomUtil.create("details","legend"); if (!mqMobile.matches) d.open = true; d.innerHTML = `<summary>สัญลักษณ์</summary><div class="lg">` +
-  Object.values(GROUPS).map(g => `<div><i style="background:${g.color}"></i>${g.label}</div>`).join("") + `</div>`;
+  Object.values(GROUPS).map(g => `<div><i style="background:${g.color}"></i>${g.label}</div>`).join("") +
+  ROAD_LINES.map(r => `<div><i class="ln" style="background:${r.color}"></i>${r.name}</div>`).join("") + `</div>`;
   L.DomEvent.disableClickPropagation(d); return d; };
 legend.addTo(map);
 
@@ -1265,6 +1292,35 @@ function hoverHtml(p){
 const BUS_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M6 2.5h12a2.5 2.5 0 0 1 2.5 2.5v11.5a2 2 0 0 1-1.5 1.94V20a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1.5H8V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1.56A2 2 0 0 1 3.5 16.5V5A2.5 2.5 0 0 1 6 2.5Zm.5 3a1 1 0 0 0-1 1V11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1h-11ZM7 14a1.25 1.25 0 1 0 0 2.5A1.25 1.25 0 0 0 7 14Zm10 0a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z"/></svg>`;
 const iconFor = p => L.divIcon({className:"", iconSize:[32,40], iconAnchor:[16,40], tooltipAnchor:[0,-38],
   html:`<div class="pin" style="--pc:${GROUPS[p.group].color}">${BUS_SVG}</div>`});
+let selRoad = null;
+const roadLayers = {};
+ROAD_LINES.forEach(r => {
+  const ln = L.polyline(r.coords, {color:r.color, weight:5, opacity:.8, lineCap:"round"}).addTo(map);
+  ln.bindTooltip(r.name, {sticky:true, direction:"top", className:"road-tip"});
+  ln.on("click", e => { L.DomEvent.stopPropagation(e); selectRoad(selRoad === r.name ? null : r.name); });
+  roadLayers[r.name] = ln;
+});
+function styleRoads(){
+  ROAD_LINES.forEach(r => roadLayers[r.name].setStyle(
+    !selRoad ? {weight:5, opacity:.8} : r.name === selRoad ? {weight:8, opacity:1} : {weight:4, opacity:.2}));
+  if (selRoad) roadLayers[selRoad].bringToFront();
+}
+function selectRoad(name){
+  selRoad = name;
+  styleRoads(); renderRoads(); renderList();
+  if (name) {
+    const pts = POINTS.filter(p => p.line === name).map(p => [p.latD, p.lngD]);
+    const peek = mqMobile.matches ? (parseInt(getComputedStyle(document.documentElement).getPropertyValue("--peek")) || 150) : 0;
+    map.fitBounds(roadLayers[name].getBounds().extend(pts.length ? L.latLngBounds(pts) : roadLayers[name].getBounds()), {paddingTopLeft:[30, 30], paddingBottomRight:[30, 30 + peek]});
+  }
+}
+function renderRoads(){
+  const box = document.getElementById("roads");
+  box.innerHTML = `<span class="lbl">ถนน</span>` +
+    `<button type="button" class="chip" data-r="" aria-pressed="${!selRoad}">ทุกถนน</button>` +
+    ROAD_LINES.map(r => `<button type="button" class="chip" data-r="${esc(r.name)}" aria-pressed="${selRoad === r.name}"><span class="bar" style="background:${r.color}"></span>${esc(r.name.replace(/^ถนน/, ""))} <small>${POINTS.filter(p => p.line === r.name).length}</small></button>`).join("");
+  box.querySelectorAll(".chip").forEach(b => b.onclick = () => selectRoad(b.dataset.r || null));
+}
 const shown = {};
 POINTS.forEach(p => shown[p.id] = !p.hidden);
 const markers = {};
@@ -1329,7 +1385,7 @@ function matchQuery(p){
   const term = q.replace(/^(ถนน|ถ\.|ซอย|ซ\.)/, "");
   return [p.road, p.near, p.detail, p.place, GROUPS[p.group].label].some(t => squash(t).includes(term));
 }
-const match = p => matchFilter(p) && matchQuery(p);
+const match = p => matchFilter(p) && matchQuery(p) && (!selRoad || p.line === selRoad);
 function renderFilters(){
   const box = document.getElementById("filters");
   const on = k => k === "all" ? !filters.size : filters.has(k);
@@ -1513,7 +1569,7 @@ qEl.addEventListener("keydown", e => {
 });
 qClear.onclick = () => { qEl.value = ""; query = ""; qClear.hidden = true; renderList(); qEl.focus(); };
 
-renderStats(); renderFilters(); renderList();
+renderStats(); renderFilters(); renderRoads(); renderList();
 setSheet(false); setPeek(); fitAll();
 if (document.fonts) document.fonts.ready.then(() => { setPeek(); });
 </script>

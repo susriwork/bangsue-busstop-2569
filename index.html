@@ -684,7 +684,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   --shelter:#4b8fd6;      /* ศาลาชำรุด: ฟ้าใส */
   --move:#8a7ee0;         /* ควรย้าย/ปรับจุด: ม่วงลาเวนเดอร์ */
   --sign-old:#6b7a84;     /* ป้ายเก่า (ไม่ได้ระบุว่าชำรุด): เทาอมฟ้า */
-  --shelter-ok:#a8864f;   /* ศาลาเก่าปกติ: น้ำตาลทราย */
+  --shelter-ok:#a8864f;   /* ศาลาเก่า: น้ำตาลทราย */
   --sign-new:#3f9a4a;     /* ป้ายใหม่: เขียว */
   --shelter-new:#b0699f;  /* ศาลาใหม่: ชมพูอมม่วง */
   --lamp-off:#f0716a;     /* จุดไฟชำรุด: ส้มคอรัลอ่อน */
@@ -907,7 +907,7 @@ const GROUPS = {
   shelter:{label:"ศาลาเก่าชำรุด",        color:"var(--shelter)"},
   move:   {label:"ควรปรับแก้/ย้ายจุด",   color:"var(--move)"},
   signOld:   {label:"ป้ายเก่า",        color:"var(--sign-old)"},
-  shelterOk: {label:"ศาลาเก่าปกติ",    color:"var(--shelter-ok)"},
+  shelterOk: {label:"ศาลาเก่า",        color:"var(--shelter-ok)"},
   signNew:   {label:"ป้ายใหม่",        color:"var(--sign-new)"},
   shelterNew:{label:"ศาลาใหม่",        color:"var(--shelter-new)"},
 };
@@ -957,12 +957,12 @@ const POINTS = [
   {id:40, group:"sign", lat:`13°49'52.21"N`, lng:`100°31'30.30"E`, place:"วัดทองสุทธาราม"},
   {id:41, group:"sign", lat:`13°49'57.64"N`, lng:`100°31'24.05"E`, place:"ตรงข้ามวัดเลียบราษฎร์บำรุง"},
   {id:42, group:"sign", lat:`13°49'15.10"N`, lng:`100°31'56.89"E`, place:"ตลาดบางซ่อน"},
-  {id:43, group:"shelter", lat:`13°49'58.14"N`, lng:`100°32'22.20"E`, place:"รพ.เกษมราษฎร์ ประชาชื่น"},
-  {id:44, group:"shelter", lat:`13°48'28.64"N`, lng:`100°31'51.37"E`, place:"หลังแยกเตาปูน"},
-  {id:45, group:"shelter", lat:`13°48'23.39"N`, lng:`100°31'31.09"E`, place:"ตรงข้ามเดอะทรี อินเตอร์เชนจ์ คอนโด"},
-  {id:46, group:"shelter", lat:`13°49'38.18"N`, lng:`100°32'17.87"E`, place:"ซอยคลังมนตรี"},
-  {id:47, group:"shelter", lat:`13°48'25.58"N`, lng:`100°31'17.86"E`, place:"หลังแยกบางโพ"},
-  {id:48, group:"shelter", lat:`13°48'11.35"N`, lng:`100°31'17.08"E`, place:"สถานีดับเพลิงบางโพ"},
+  {id:43, group:"shelterOk", lat:`13°49'58.14"N`, lng:`100°32'22.20"E`, place:"รพ.เกษมราษฎร์ ประชาชื่น"},
+  {id:44, group:"shelterOk", lat:`13°48'28.64"N`, lng:`100°31'51.37"E`, place:"หลังแยกเตาปูน"},
+  {id:45, group:"shelterOk", lat:`13°48'23.39"N`, lng:`100°31'31.09"E`, place:"ตรงข้ามเดอะทรี อินเตอร์เชนจ์ คอนโด"},
+  {id:46, group:"shelterOk", lat:`13°49'38.18"N`, lng:`100°32'17.87"E`, place:"ซอยคลังมนตรี"},
+  {id:47, group:"shelterOk", lat:`13°48'25.58"N`, lng:`100°31'17.86"E`, place:"หลังแยกบางโพ"},
+  {id:48, group:"shelterOk", lat:`13°48'11.35"N`, lng:`100°31'17.08"E`, place:"สถานีดับเพลิงบางโพ"},
   {id:49, group:"signOld", lat:`13°49'44.32"N`, lng:`100°32'18.80"E`, place:"แยกประชานุกูล"},
   {id:50, group:"signOld", lat:`13°48'57.51"N`, lng:`100°32'08.07"E`, place:"ตรงข้ามสะพาน 99"},
   {id:51, group:"signOld", lat:`13°48'34.92"N`, lng:`100°32'02.76"E`, place:"ตรงข้ามสำนักงานเขตบางซื่อ"},

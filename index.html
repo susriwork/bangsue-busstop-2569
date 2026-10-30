@@ -1537,13 +1537,17 @@ async function uploadPhotos(p, files){
   if (openId === p.id) openDetail(p);
   say(fail ? `อัปโหลดสำเร็จ ${ok} จาก ${files.length} รูป · ${fail}` : `อัปโหลดสำเร็จ ${ok} รูป`, !!fail);
 }
-/* โหลดรายการรูปล่าสุดจากชีต รวมกับรูปที่ฝังไว้ในไฟล์ */
+/* โหลดรายการรูปล่าสุดจากชีต แล้วใช้แทนรูปที่ฝังไว้ในไฟล์ (ลบลิงก์ในชีต = รูปหายจากเว็บ)
+   ถ้าโหลดจากชีตไม่ได้ จะใช้รูปที่ฝังไว้ในไฟล์ตามเดิม */
 function loadSheetPhotos(){
   if (!PHOTO_API) return;
-  fetch(PHOTO_API).then(r => r.json()).then(j => {
-    if (!j || !j.ok) return;
+  fetch(PHOTO_API, {cache:"no-store"}).then(r => r.json()).then(j => {
+    if (!j || !j.ok || !j.photos) return;
     let changed = false;
-    POINTS.forEach(p => (j.photos[p.id] || []).forEach(id => { if (!p.photos.includes(id)) { p.photos.push(id); changed = true; } }));
+    POINTS.forEach(p => {
+      const next = (j.photos[p.id] || []).slice();
+      if (next.join() !== p.photos.join()) { p.photos = next; changed = true; }
+    });
     if (changed) { renderList(); const o = POINTS.find(p => p.id === openId); if (o) openDetail(o); }
   }).catch(() => {});
 }

@@ -753,6 +753,8 @@ h1{font:700 21px/1.3 var(--f-display);margin:8px 0 4px;text-wrap:balance}
 .addform label.chk{flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:14.5px}
 .addform .chk input{width:18px;height:18px}
 .addform .req{color:var(--alert-ink)}
+.addform .auto-note{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.addform select:disabled{opacity:1;color:var(--ink)}
 .linkbtn{font:500 13px var(--f-body);background:none;border:0;color:var(--stop);padding:0;cursor:pointer;text-decoration:underline}
 .leaflet-marker-icon.is-out{pointer-events:none;cursor:default}
 .visbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 8px;padding:8px 18px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
@@ -1264,7 +1266,19 @@ const FIELDS = ["shelterForm","shelterStatus","chairsBroken","tempLamp","signFor
 const clean = v => { if (v == null) return null; const s = String(v).trim(); return (!s || s === "(None)") ? null : s; };
 const dms = s => { const m = s.match(/(\d+)°(\d+)'([\d.]+)"([NSEW])/); let v = +m[1] + m[2]/60 + m[3]/3600; return /[SW]/.test(m[4]) ? -v : v; };
 function applyFields(p, arr){ FIELDS.forEach((f,i) => p[f] = clean(arr[i])); }
-POINTS.forEach(p => { [p.road, p.near, p.sub] = (ROADS[p.id] || ["","",""]); p.latD = dms(p.lat); p.lngD = dms(p.lng); p.photos = PHOTOS[p.id] || []; applyFields(p, DATA[p.id] || []); });
+/* กลุ่ม (สีไอคอน) ตั้งอัตโนมัติจากข้อมูลป้ายและศาลา ยกเว้น "ควรปรับแก้/ย้ายจุด" ที่เลือกเอง
+   มีศาลา: ใหม่ → ศาลาใหม่ · เก่า+ชำรุด → ศาลาเก่าชำรุด · เก่า → ศาลาเก่า
+   ไม่มีศาลา: ป้ายใหม่/ดิจิตอล → ป้ายใหม่ · ป้ายเก่า+เลือนลาง/โดนบดบัง/ชำรุด → ป้ายเก่าชำรุด · ป้ายเก่า → ป้ายเก่า
+   ข้อมูลไม่พอ = ใช้กลุ่มเดิม */
+function groupFrom(v){
+  const sf = v.shelterForm || "", gf = v.signForm || "";
+  if (/เก่า|ใหม่/.test(sf)) return /ใหม่/.test(sf) ? "shelterNew" : /ไฟ|เก้าอี้|โครงสร้าง|ชำรุด/.test(v.shelterStatus || "") ? "shelter" : "shelterOk";
+  if (/ใหม่|ดิจิ/.test(gf)) return "signNew";
+  if (/เก่า/.test(gf)) return /เลือนลาง|โดนบดบัง|ชำรุด/.test(v.signStatus || "") ? "sign" : "signOld";
+  return null;
+}
+function syncGroup(p){ if (p.group !== "move") p.group = groupFrom(p) || p.group; }
+POINTS.forEach(p => { [p.road, p.near, p.sub] = (ROADS[p.id] || ["","",""]); p.latD = dms(p.lat); p.lngD = dms(p.lng); p.photos = PHOTOS[p.id] || []; applyFields(p, DATA[p.id] || []); syncGroup(p); });
 
 function segDist(p, a, b){
   const k = 111320, c = Math.cos(p[0] * Math.PI / 180);
@@ -1650,7 +1664,7 @@ function loadSheetPhotos(){
     let changed = false;
     if (j.frames && JSON.stringify(j.frames) !== JSON.stringify(FRAMES)) { FRAMES = j.frames; changed = true; }
     const F = j.fields || {};
-    POINTS.forEach(p => { const f = F[p.id]; if (f && f.some(v => v != null && v !== "")) { applyFields(p, f); changed = true; } });
+    POINTS.forEach(p => { const f = F[p.id]; if (f && f.some(v => v != null && v !== "")) { applyFields(p, f); syncGroup(p); changed = true; } });
     (j.points || []).forEach(n => {
       if (DELETED_IDS.has(+n.id)) return;
       const p = POINTS.find(x => x.id === n.id);
@@ -1671,6 +1685,7 @@ function addPoint(n, photos){
   const p = {id:n.id, group: GROUP_BY_LABEL[n.group] || GROUPS[n.group] && n.group || "signOld", lat:"", lng:"",
              latD:+n.lat, lngD:+n.lng, place:n.place || "", road:n.road || "", near:"", sub:"", photos: photos || [], added:true};
   applyFields(p, n.f || []);
+  syncGroup(p);
   p.line = nearestLine(p.latD, p.lngD);
   POINTS.push(p); shown[p.id] = true; addMarker(p);
   return p;
@@ -1681,6 +1696,7 @@ function applyEdit(p, n){
   if (isFinite(+n.lat) && +n.lat) { p.latD = +n.lat; p.lngD = +n.lng; markers[p.id].setLatLng([p.latD, p.lngD]); }
   p.place = n.place || ""; if (n.road) p.road = n.road;
   if (n.f && n.f.some(v => v != null && v !== "")) applyFields(p, n.f);
+  syncGroup(p);
   p.line = nearestLine(p.latD, p.lngD);
 }
 const OPTS = {
@@ -1715,7 +1731,7 @@ function startEdit(p){
   draft.marker.on("dragend", () => { draft.latlng = draft.marker.getLatLng(); updateDraftCoords(); });
   openAddForm();
   const f = draft.form;
-  f.group.value = p.group; f.place.value = p.place || ""; f.road.value = p.road || ""; f.road.dataset.touched = "1";
+  f.move.checked = p.group === "move"; f.group.value = p.group === "move" ? (groupFrom(p) || "") : p.group; f.place.value = p.place || ""; f.road.value = p.road || ""; f.road.dataset.touched = "1";
   const setSel = (el, v) => { v = v == null ? "" : String(v); if (v && ![...el.options].some(o => o.value === v)) el.add(new Option(v, v)); el.value = v; };
   setSel(f.signForm, p.signForm); setSel(f.signStatus, p.signStatus); setSel(f.shelterForm, p.shelterForm);
   const st = String(p.shelterStatus || "").split(",").map(x => x.trim());
@@ -1725,7 +1741,7 @@ function startEdit(p){
   f.dispatchEvent(new Event("change"));
 }
 const draftIcon = () => L.divIcon({className:"", iconSize:[32,40], iconAnchor:[16,40],
-  html:`<div class="pin draft" style="--pc:${draft && draft.form ? GROUPS[draft.form.querySelector("[name=group]").value]?.color || "var(--party)" : "var(--party)"}">${BUS_SVG}</div>`});
+  html:`<div class="pin draft" style="--pc:${draft && draft.form ? GROUPS[draft.form.move.checked ? "move" : draft.form.group.value]?.color || "var(--party)" : "var(--party)"}">${BUS_SVG}</div>`});
 function placeDraft(latlng){
   if (!draft) return;
   draft.latlng = latlng;
@@ -1758,7 +1774,8 @@ function openAddForm(){
   drawer.innerHTML = `
     <header><h2>${draft.mode === "edit" ? `แก้ไขข้อมูลจุดที่ ${draft.p.id}` : "เพิ่มหมุดใหม่"}</h2><button type="button" class="x" aria-label="ยกเลิก">×</button></header>
     <form class="scroll addform" novalidate>
-      <label><span>กลุ่ม <b class="req">*</b></span><select name="group" required><option value="">เลือกกลุ่ม</option>${Object.entries(GROUPS).map(([k,g]) => `<option value="${k}">${g.label}</option>`).join("")}</select></label>
+      <label><span>กลุ่ม <b class="req">*</b> <small class="auto-note">ตั้งอัตโนมัติจากข้อมูลป้ายและศาลาด้านล่าง</small></span><select name="group" required><option value="">เลือกกลุ่ม</option>${Object.entries(GROUPS).filter(([k]) => k !== "move").map(([k,g]) => `<option value="${k}">${g.label}</option>`).join("")}</select></label>
+      <label class="chk"><input type="checkbox" name="move">${GROUPS.move.label}</label>
       <label>ชื่อที่ตั้ง<input name="place" maxlength="200" placeholder="เช่น หน้าวัดน้อย"></label>
       <label>ถนน<input name="road" maxlength="200" list="roadList"><datalist id="roadList">${ROAD_LINES.map(r => `<option>${r.name}</option>`).join("")}</datalist></label>
       <fieldset><legend>ป้าย</legend>
@@ -1789,6 +1806,10 @@ function openAddForm(){
     f.querySelector("[data-if=chair]").hidden = !st.includes("เก้าอี้ชำรุด");
     f.querySelector("[data-if=lamp]").hidden = !st.includes("ไฟส่องสว่างชำรุด");
     f.querySelector("[data-if=bench]").hidden = f.bench.value !== "มี";
+    const auto = groupFrom({shelterForm:f.shelterForm.value, shelterStatus:st.join(", "), signForm:f.signForm.value, signStatus:f.signStatus.value});
+    if (auto) f.group.value = auto;
+    f.group.disabled = !!auto || f.move.checked;
+    f.group.closest("label").style.opacity = f.move.checked ? .5 : "";
     if (draft && draft.marker) draft.marker.setIcon(draftIcon());
   };
   f.addEventListener("change", sync);
@@ -1803,7 +1824,8 @@ function openAddForm(){
 async function submitDraft(f){
   const st = f.querySelector(".up-status");
   const say = (t, err) => { st.hidden = false; st.textContent = t; st.classList.toggle("err", !!err); };
-  if (!f.group.value) { say("กรุณาเลือกกลุ่ม", true); f.group.focus(); return; }
+  const gkey = f.move.checked ? "move" : f.group.value;
+  if (!gkey) { say("กรุณาเลือกกลุ่ม หรือกรอกรูปแบบป้าย/ศาลา", true); f.group.focus(); return; }
   const statuses = [...f.querySelectorAll("[name=shelterStatus]:checked")].map(i => i.value);
   const vals = {
     shelterForm:f.shelterForm.value, shelterStatus:statuses, chairsBroken:f.chairsBroken.value, tempLamp:f.tempLamp.value,
@@ -1815,7 +1837,7 @@ async function submitDraft(f){
     const {lat, lng} = draft.latlng;
     const edit = draft.mode === "edit";
     const body = {action: edit ? "updatePoint" : "addPoint", id: edit ? draft.p.id : undefined, lat, lng,
-                  group:GROUPS[f.group.value].label, place:f.place.value.trim(), road:f.road.value.trim(), f:vals};
+                  group:GROUPS[gkey].label, place:f.place.value.trim(), road:f.road.value.trim(), f:vals};
     const r = await fetch(PHOTO_API, {method:"POST", body: JSON.stringify(body)}).then(r => r.json());
     if (!r.ok) throw new Error(r.error || "บันทึกไม่สำเร็จ");
     const num = v => { const n = parseInt(v, 10); return n > 0 ? n : null; };
